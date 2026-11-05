@@ -2,7 +2,7 @@
   "config": {
     "step": {
       "user": {
-        "title": "MIoT vacuum rooms",
+        "title": "MIoT Vacuum Rooms",
         "description": "Select the vacuum from the Xiaomi Home integration. The matching action and sensor entities are found automatically.",
         "data": {
           "vacuum_entity_id": "Vacuum"

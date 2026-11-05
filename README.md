@@ -33,7 +33,7 @@ The integration's UI is available in English and German.
 
 1. HACS → Integrations → menu → *Custom repositories* → enter the repository URL, category *Integration*.
 2. Download, then restart Home Assistant.
-3. Settings → Devices & services → *Add integration* → "MIoT vacuum rooms" → select the vacuum (`vacuum.…`).
+3. Settings → Devices & services → *Add integration* → "MIoT Vacuum Rooms" → select the vacuum (`vacuum.…`).
 
 Repository: https://github.com/coding-pagro/ha-miot-vacuum-rooms
 

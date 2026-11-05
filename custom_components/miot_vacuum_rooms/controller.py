@@ -85,7 +85,7 @@ class VacuumController:
             identifiers={(DOMAIN, entry.entry_id)},
             name=entry.title,
             manufacturer="Xiaomi Home (MIoT)",
-            model="Saugroboter Räume",
+            model="Vacuum Rooms",
             entry_type=DeviceEntryType.SERVICE,
         )
 

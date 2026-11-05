@@ -1,6 +1,6 @@
 {
   "domain": "miot_vacuum_rooms",
-  "name": "MIoT Saugroboter Räume",
+  "name": "MIoT Vacuum Rooms",
   "codeowners": [],
   "config_flow": true,
   "dependencies": ["notify"],
