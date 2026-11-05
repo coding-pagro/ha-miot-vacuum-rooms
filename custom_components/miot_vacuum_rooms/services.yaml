@@ -1,0 +1,55 @@
+clean_rooms:
+  fields:
+    rooms:
+      required: true
+      example: '["Küche", "Wohnzimmer"]'
+      selector:
+        text:
+          multiple: true
+    entry_id:
+      required: false
+      selector:
+        config_entry:
+          integration: miot_vacuum_rooms
+
+clean_floor:
+  fields:
+    entry_id:
+      required: false
+      selector:
+        config_entry:
+          integration: miot_vacuum_rooms
+
+learn_room:
+  fields:
+    name:
+      required: true
+      example: "Küche"
+      selector:
+        text:
+    timeout:
+      required: false
+      default: 90
+      selector:
+        number:
+          min: 10
+          max: 300
+          unit_of_measurement: s
+    entry_id:
+      required: false
+      selector:
+        config_entry:
+          integration: miot_vacuum_rooms
+
+forget_room:
+  fields:
+    name:
+      required: true
+      example: "Küche"
+      selector:
+        text:
+    entry_id:
+      required: false
+      selector:
+        config_entry:
+          integration: miot_vacuum_rooms

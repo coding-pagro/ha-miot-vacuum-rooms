@@ -1,0 +1,13 @@
+{
+  "domain": "miot_vacuum_rooms",
+  "name": "MIoT Saugroboter Räume",
+  "codeowners": [],
+  "config_flow": true,
+  "dependencies": ["notify"],
+  "documentation": "https://github.com/coding-pagro/ha-miot-vacuum-rooms",
+  "integration_type": "service",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/coding-pagro/ha-miot-vacuum-rooms/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}

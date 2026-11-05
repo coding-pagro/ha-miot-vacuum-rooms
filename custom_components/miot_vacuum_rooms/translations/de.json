@@ -1,0 +1,182 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "MIoT Saugroboter Räume",
+        "description": "Wähle den Saugroboter aus der Xiaomi-Home-Integration. Die zugehörigen Aktions- und Sensor-Entitäten werden automatisch gefunden.",
+        "data": {
+          "vacuum_entity_id": "Saugroboter"
+        }
+      }
+    },
+    "error": {
+      "no_device": "Die gewählte Entität gehört zu keinem Gerät.",
+      "missing_entities": "Am Gerät fehlen erwartete Entitäten: {missing}"
+    },
+    "abort": {
+      "already_configured": "Dieser Saugroboter ist bereits eingerichtet."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Räume und Verhalten",
+        "description": "Ein Raum pro Zeile im Format Name=ID, zum Beispiel Küche=4. Die IDs lernst du am einfachsten mit dem Dienst „Raum anlernen“.",
+        "data": {
+          "rooms": "Räume",
+          "require_docked": "Nur aus der Station starten"
+        },
+        "data_description": {
+          "require_docked": "Verhindert einen Start mitten in einem laufenden Auftrag, bei dem der Roboter die Orientierung verlieren kann."
+        }
+      }
+    },
+    "error": {
+      "invalid_rooms": "{error}"
+    }
+  },
+  "entity": {
+    "select": {
+      "mode": {
+        "name": "Reinigungsmodus",
+        "state": {
+          "both": "Saugen & Wischen",
+          "sweep": "Saugen",
+          "mop": "Wischen",
+          "sweep_then_mop": "Saugen und wischen",
+          "custom": "Personalisieren"
+        }
+      },
+      "fan": {
+        "name": "Saugleistung",
+        "state": {
+          "quiet": "Leise",
+          "standard": "Standard",
+          "strong": "Stark",
+          "max": "Max"
+        }
+      },
+      "water": {
+        "name": "Nässe",
+        "state": {
+          "low": "Niedrig",
+          "medium": "Mittel",
+          "high": "Hoch"
+        }
+      },
+      "count": {
+        "name": "Durchgänge",
+        "state": {
+          "once": "Einmal",
+          "twice": "Zweimal"
+        }
+      },
+      "route": {
+        "name": "Routenpräferenz",
+        "state": {
+          "fast": "Schnell",
+          "daily": "Täglich",
+          "deep": "Tief"
+        }
+      }
+    },
+    "button": {
+      "room": {
+        "name": "{room} reinigen"
+      }
+    }
+  },
+  "services": {
+    "clean_rooms": {
+      "name": "Räume reinigen",
+      "description": "Startet die Reinigung der genannten Räume im Modus „Personalisieren“. Es gelten die Raumeinstellungen aus der App. Die Reihenfolge der Namen ist die Reihenfolge der Reinigung.",
+      "fields": {
+        "rooms": {
+          "name": "Räume",
+          "description": "Namen der angelernten Räume."
+        },
+        "entry_id": {
+          "name": "Saugroboter",
+          "description": "Nur nötig, wenn mehrere Saugroboter eingerichtet sind."
+        }
+      }
+    },
+    "clean_floor": {
+      "name": "Ganzes Stockwerk reinigen (ungetestet)",
+      "description": "Startet eine Reinigung des ganzen Stockwerks mit den aktuell eingestellten globalen Werten. Der Befehl ist aus dem App-Verhalten abgeleitet und noch nicht am Gerät geprüft.",
+      "fields": {
+        "entry_id": {
+          "name": "Saugroboter",
+          "description": "Nur nötig, wenn mehrere Saugroboter eingerichtet sind."
+        }
+      }
+    },
+    "learn_room": {
+      "name": "Raum anlernen",
+      "description": "Wartet, bis du in der App genau einen Raum startest, und speichert dessen ID unter dem Namen. Den Lauf danach in der App abbrechen oder pausieren.",
+      "fields": {
+        "name": {
+          "name": "Name",
+          "description": "Name, unter dem der Raum gespeichert wird."
+        },
+        "timeout": {
+          "name": "Wartezeit",
+          "description": "Wie lange auf den Start in der App gewartet wird."
+        },
+        "entry_id": {
+          "name": "Saugroboter",
+          "description": "Nur nötig, wenn mehrere Saugroboter eingerichtet sind."
+        }
+      }
+    },
+    "forget_room": {
+      "name": "Raum entfernen",
+      "description": "Löscht einen angelernten Raum samt Taste.",
+      "fields": {
+        "name": {
+          "name": "Name",
+          "description": "Name des Raums."
+        },
+        "entry_id": {
+          "name": "Saugroboter",
+          "description": "Nur nötig, wenn mehrere Saugroboter eingerichtet sind."
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "unknown_room": {
+      "message": "Raum „{room}“ ist nicht angelernt."
+    },
+    "not_docked": {
+      "message": "Der Saugroboter steht nicht in der Station (Zustand: {state}). Start abgebrochen. Die Bedingung lässt sich in den Optionen abschalten."
+    },
+    "vacuum_unavailable": {
+      "message": "Der Saugroboter ist nicht erreichbar."
+    },
+    "mode_timeout": {
+      "message": "Der Modus „Personalisieren“ wurde nicht bestätigt. Start abgebrochen."
+    },
+    "source_missing": {
+      "message": "Die Quell-Entität für „{role}“ existiert nicht mehr. Integration neu einrichten."
+    },
+    "empty_name": {
+      "message": "Der Name darf nicht leer sein."
+    },
+    "learn_timeout": {
+      "message": "In {seconds} Sekunden wurde kein Raum in der App gestartet."
+    },
+    "learn_not_single": {
+      "message": "Es wurde mehr als ein Raum gestartet ({ids}). Zum Anlernen genau einen Raum wählen."
+    },
+    "entry_not_found": {
+      "message": "Der angegebene Saugroboter ist nicht eingerichtet."
+    },
+    "no_entry": {
+      "message": "Es ist kein Saugroboter eingerichtet."
+    },
+    "entry_required": {
+      "message": "Es sind mehrere Saugroboter eingerichtet. Bitte entry_id angeben."
+    }
+  }
+}

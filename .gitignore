@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Tests / Tools
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Editoren / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Claude Code (lokale Einstellungen)
+.claude/settings.local.json
+
+# Persönliche Notizen (Grundriss, Geräte-ID)
+saugroboter-erkenntnisse.md
+docs/ERKENNTNISSE.md

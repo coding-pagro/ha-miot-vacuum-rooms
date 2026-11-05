@@ -1,0 +1,182 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "MIoT vacuum rooms",
+        "description": "Select the vacuum from the Xiaomi Home integration. The matching action and sensor entities are found automatically.",
+        "data": {
+          "vacuum_entity_id": "Vacuum"
+        }
+      }
+    },
+    "error": {
+      "no_device": "The selected entity does not belong to a device.",
+      "missing_entities": "Expected entities are missing on the device: {missing}"
+    },
+    "abort": {
+      "already_configured": "This vacuum is already set up."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Rooms and behaviour",
+        "description": "One room per line as Name=ID, for example Kitchen=4. The easiest way to find the IDs is the Learn room service.",
+        "data": {
+          "rooms": "Rooms",
+          "require_docked": "Only start from the dock"
+        },
+        "data_description": {
+          "require_docked": "Prevents starting in the middle of a running job, where the robot may lose its orientation."
+        }
+      }
+    },
+    "error": {
+      "invalid_rooms": "{error}"
+    }
+  },
+  "entity": {
+    "select": {
+      "mode": {
+        "name": "Cleaning mode",
+        "state": {
+          "both": "Vacuum & mop",
+          "sweep": "Vacuum",
+          "mop": "Mop",
+          "sweep_then_mop": "Vacuum, then mop",
+          "custom": "Customised"
+        }
+      },
+      "fan": {
+        "name": "Suction power",
+        "state": {
+          "quiet": "Quiet",
+          "standard": "Standard",
+          "strong": "Strong",
+          "max": "Max"
+        }
+      },
+      "water": {
+        "name": "Water level",
+        "state": {
+          "low": "Low",
+          "medium": "Medium",
+          "high": "High"
+        }
+      },
+      "count": {
+        "name": "Passes",
+        "state": {
+          "once": "Once",
+          "twice": "Twice"
+        }
+      },
+      "route": {
+        "name": "Route preference",
+        "state": {
+          "fast": "Fast",
+          "daily": "Daily",
+          "deep": "Deep"
+        }
+      }
+    },
+    "button": {
+      "room": {
+        "name": "Clean {room}"
+      }
+    }
+  },
+  "services": {
+    "clean_rooms": {
+      "name": "Clean rooms",
+      "description": "Starts cleaning the named rooms in Customised mode. The per-room settings from the app apply. The order of the names is the cleaning order.",
+      "fields": {
+        "rooms": {
+          "name": "Rooms",
+          "description": "Names of learned rooms."
+        },
+        "entry_id": {
+          "name": "Vacuum",
+          "description": "Only needed if several vacuums are set up."
+        }
+      }
+    },
+    "clean_floor": {
+      "name": "Clean whole floor (untested)",
+      "description": "Starts a whole-floor clean with the current global settings. The command is derived from app behaviour and has not been verified on the device.",
+      "fields": {
+        "entry_id": {
+          "name": "Vacuum",
+          "description": "Only needed if several vacuums are set up."
+        }
+      }
+    },
+    "learn_room": {
+      "name": "Learn room",
+      "description": "Waits until you start exactly one room in the app and stores its ID under the name. Cancel or pause the run in the app afterwards.",
+      "fields": {
+        "name": {
+          "name": "Name",
+          "description": "Name the room is stored under."
+        },
+        "timeout": {
+          "name": "Wait time",
+          "description": "How long to wait for the start in the app."
+        },
+        "entry_id": {
+          "name": "Vacuum",
+          "description": "Only needed if several vacuums are set up."
+        }
+      }
+    },
+    "forget_room": {
+      "name": "Forget room",
+      "description": "Deletes a learned room including its button.",
+      "fields": {
+        "name": {
+          "name": "Name",
+          "description": "Name of the room."
+        },
+        "entry_id": {
+          "name": "Vacuum",
+          "description": "Only needed if several vacuums are set up."
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "unknown_room": {
+      "message": "Room \"{room}\" has not been learned."
+    },
+    "not_docked": {
+      "message": "The vacuum is not on its dock (state: {state}). Start aborted. The condition can be switched off in the options."
+    },
+    "vacuum_unavailable": {
+      "message": "The vacuum is not reachable."
+    },
+    "mode_timeout": {
+      "message": "Customised mode was not confirmed. Start aborted."
+    },
+    "source_missing": {
+      "message": "The source entity for \"{role}\" no longer exists. Set up the integration again."
+    },
+    "empty_name": {
+      "message": "The name must not be empty."
+    },
+    "learn_timeout": {
+      "message": "No room was started in the app within {seconds} seconds."
+    },
+    "learn_not_single": {
+      "message": "More than one room was started ({ids}). Start exactly one room to learn it."
+    },
+    "entry_not_found": {
+      "message": "The given vacuum is not set up."
+    },
+    "no_entry": {
+      "message": "No vacuum is set up."
+    },
+    "entry_required": {
+      "message": "Several vacuums are set up. Please provide entry_id."
+    }
+  }
+}
