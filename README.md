@@ -109,7 +109,30 @@ With several vacuums, pass `entry_id` each time.
 
 ## Development
 
+The tests use [`pytest-homeassistant-custom-component`](https://github.com/MatthewFlamm/pytest-homeassistant-custom-component), which runs on Linux and macOS, not on Windows. `requirements_test.txt` pins the release that matches the current Home Assistant version. Home Assistant 2026.3 and later need **Python 3.14**.
+
+**One command for all environments:**
+
 ```
-python -m venv venv && venv/bin/pip install pytest-homeassistant-custom-component
-venv/bin/pytest
+python scripts/check.py
 ```
+
+It picks the mode from the environment and prints which one it chose and why. The exit code is the test result. Extra arguments go to pytest (local and WSL mode), e.g. `python scripts/check.py -k vacuum`.
+
+| Environment | Mode |
+|---|---|
+| Linux, macOS | Runs `python -m pytest` locally. Needs a venv with `requirements_test.txt` installed (`python3.14 -m venv .venv && .venv/bin/pip install -r requirements_test.txt`). |
+| Windows with WSL | Runs the tests inside WSL with the venv from the environment variable `MIOT_WSL_VENV` (a Linux path) or `.venv-wsl/` in the repository. |
+| Windows without WSL | **CI mode:** pushes the current branch and waits for the GitHub Actions run of this commit (needs a logged-in `gh`). It refuses to run on `main` or with uncommitted changes, because CI only tests commits. On failure it prints the failed log. |
+
+Setting up the WSL venv (once, inside WSL, from the repository folder):
+
+```
+curl -LsSf https://astral.sh/uv/install.sh | sh
+uv venv --python 3.14 ~/.venvs/miot-vacuum-rooms
+uv pip install --python ~/.venvs/miot-vacuum-rooms -r requirements_test.txt
+```
+
+Then set `MIOT_WSL_VENV=/home/<user>/.venvs/miot-vacuum-rooms` on Windows. A venv in your Linux home is much faster than one on the Windows drive and works for all checkouts.
+
+**CI:** `.github/workflows/tests.yml` runs the tests on every push and pull request against the minimum (2026.3.x) and the current (2026.10.x) Home Assistant version.
