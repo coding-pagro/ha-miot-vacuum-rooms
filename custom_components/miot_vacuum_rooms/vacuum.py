@@ -39,8 +39,17 @@ _ACTIVITIES = {
         VacuumActivity.ERROR,
     )
 }
-# Zustände der Quelle, in denen ein Auftrag läuft
-_RUNNING = ("cleaning", "paused")
+_BASE_FEATURES = (
+    VacuumEntityFeature.STATE
+    | VacuumEntityFeature.START
+    | VacuumEntityFeature.PAUSE
+    | VacuumEntityFeature.STOP
+    | VacuumEntityFeature.RETURN_HOME
+    | VacuumEntityFeature.CLEAN_AREA
+)
+# Sensorwert des Modus Personalisieren: dann gelten die Raumeinstellungen der
+# App und die globale Saugleistung ist ohne Wirkung.
+_MODE_CUSTOM_STATE = SELECTS["mode"]["options"][MODE_CUSTOM][1]
 
 
 async def async_setup_entry(
@@ -58,21 +67,16 @@ class MiotRoomsVacuum(StateVacuumEntity):
     _attr_name = None
     _attr_should_poll = False
     _attr_translation_key = "vacuum"
-    _attr_supported_features = (
-        VacuumEntityFeature.STATE
-        | VacuumEntityFeature.START
-        | VacuumEntityFeature.PAUSE
-        | VacuumEntityFeature.STOP
-        | VacuumEntityFeature.RETURN_HOME
-        | VacuumEntityFeature.FAN_SPEED
-        | VacuumEntityFeature.CLEAN_AREA
-    )
+    _attr_supported_features = _BASE_FEATURES | VacuumEntityFeature.FAN_SPEED
 
     def __init__(self, controller: VacuumController) -> None:
         self._controller = controller
         fan = SELECTS["fan"]["options"]
         self._attr_fan_speed_list = list(fan)
         self._fan_from_sensor = {sensor: option for option, (_, sensor) in fan.items()}
+        self._mode_from_sensor = {
+            sensor: option for option, (_, sensor) in SELECTS["mode"]["options"].items()
+        }
         self._attr_unique_id = f"{controller.entry.entry_id}_vacuum"
         self._attr_device_info = controller.device_info
         self._logged_states: set[str] = set()
@@ -82,7 +86,7 @@ class MiotRoomsVacuum(StateVacuumEntity):
         self._async_check_segments_changed()
         tracked = [
             entity_id
-            for role in ("vacuum", "prop_fan")
+            for role in ("vacuum", "prop_fan", "prop_mode")
             if (entity_id := self._controller.entity_id(role)) is not None
         ]
         self._update()
@@ -108,6 +112,17 @@ class MiotRoomsVacuum(StateVacuumEntity):
                 _LOGGER.debug("Unbekannter Zustand des Saugroboters: %s", state)
         self._attr_fan_speed = self._fan_from_sensor.get(
             self._controller.state("prop_fan")
+        )
+        mode = self._controller.state("prop_mode")
+        self._attr_extra_state_attributes = {
+            "cleaning_mode": self._mode_from_sensor.get(mode)
+        }
+        # Im Modus Personalisieren ist die globale Saugleistung ohne Wirkung:
+        # die Steuerung verschwindet aus dem Dialog (wie bei Dreame).
+        self._attr_supported_features = (
+            _BASE_FEATURES
+            if mode == _MODE_CUSTOM_STATE
+            else _BASE_FEATURES | VacuumEntityFeature.FAN_SPEED
         )
 
     # --- Steuerung -------------------------------------------------------
@@ -144,11 +159,9 @@ class MiotRoomsVacuum(StateVacuumEntity):
                     "options": ", ".join(self._attr_fan_speed_list),
                 },
             )
-        custom = SELECTS["mode"]["options"][MODE_CUSTOM][1]
-        if (
-            self._controller.state("vacuum") in _RUNNING
-            and self._controller.state("prop_mode") == custom
-        ):
+        # Der Dienst prüft das ausgeblendete Feature schon selbst; das hier
+        # fängt direkte Aufrufe und einen Moduswechsel kurz davor ab.
+        if self._controller.state("prop_mode") == _MODE_CUSTOM_STATE:
             raise ServiceValidationError(
                 translation_domain=DOMAIN, translation_key="fan_speed_customised"
             )

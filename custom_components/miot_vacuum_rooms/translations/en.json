@@ -100,6 +100,16 @@
               "strong": "Strong",
               "max": "Max"
             }
+          },
+          "cleaning_mode": {
+            "name": "Cleaning mode",
+            "state": {
+              "both": "Vacuum & mop",
+              "sweep": "Vacuum",
+              "mop": "Mop",
+              "sweep_then_mop": "Vacuum, then mop",
+              "custom": "Customised"
+            }
           }
         }
       }
@@ -210,7 +220,7 @@
       "message": "The cleaning mode is set to Customised. Choose another cleaning mode or switch on \"Use room settings from the app\"."
     },
     "fan_speed_customised": {
-      "message": "The robot is cleaning in Customised mode and uses the per-room settings from the app for this run. The fan speed cannot be changed now."
+      "message": "The cleaning mode is Customised: the robot uses the per-room settings from the app, so the global fan speed has no effect. Choose another cleaning mode first, or use the \"Suction power\" select."
     }
   }
 }

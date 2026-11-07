@@ -94,7 +94,7 @@ The integration adds its own vacuum entity (`vacuum.<device>`) to its device. It
 |---|---|
 | Start | Robot **paused**: resumes the paused run. Otherwise: cleans **all learned rooms** like `clean_rooms` (same dock check). Without learned rooms it refuses. It never starts a run without a room selection. |
 | Pause, stop, return to base | Passed through to the Xiaomi vacuum. |
-| Fan speed | Global suction power, see below. |
+| Fan speed | Global suction power, see below. Hidden while the cleaning mode is *Customised*. |
 | `vacuum.clean_area` | Cleans the rooms mapped to the given areas, in the given order. |
 
 **Area cleaning:** open the vacuum entity → settings → map Home Assistant areas to the learned rooms. Then areas work in `vacuum.clean_area`, for example from the vacuum card or a voice assistant:
@@ -111,7 +111,11 @@ data:
 
 If the set of room IDs changes after you mapped the areas (learning a new room, forgetting one, or editing the IDs in the options), Home Assistant shows a repair notice. Open it and check the mapping again. Renaming a room keeps the mapping, because it is stored by room ID.
 
-**Fan speed:** there are two suction power values. The **global** one (shown and set by the fan speed of this entity and by the "Suction power" select) and the **per-room** one from the app, which Home Assistant can neither read nor set. In *Customised* mode the robot uses the per-room value, so the fan speed of this entity only matters for room cleaning when **"Use room settings from the app" is off** (see Cleaning rooms). With the switch on, it has no effect on room cleaning. While a run in *Customised* mode is active, changing the fan speed is refused.
+**Fan speed:** there are two suction power values. The **global** one (shown and set by the fan speed of this entity and by the "Suction power" select) and the **per-room** one from the app, which Home Assistant can neither read nor set. In *Customised* mode the robot uses the per-room value, so the fan speed of this entity only matters for room cleaning when **"Use room settings from the app" is off** (see Cleaning rooms). With the switch on, it has no effect on room cleaning.
+
+So while the cleaning mode is *Customised*, the vacuum entity **hides its fan speed** (the control disappears from the dialog and `vacuum.set_fan_speed` is refused). It comes back as soon as another cleaning mode is selected. With the switch on, every room start sets *Customised*, so in practice the fan speed only shows when you deliberately pick another mode, which is exactly when it has an effect. The "Suction power" select stays available to set the global value at any time.
+
+**Cleaning mode:** the vacuum dialog has no field for it, so the entity reports it as the attribute `cleaning_mode` (shown translated under *Attributes* in the dialog). To see and change it at a glance, put the "Cleaning mode" select next to the vacuum on your dashboard.
 
 **Tip:** the Xiaomi vacuum entity is no longer needed on dashboards. You can hide it: Settings → Entities → select the Xiaomi vacuum → settings → *Visible* off. Do not disable or delete it, this integration reads its state and sends commands through it.
 

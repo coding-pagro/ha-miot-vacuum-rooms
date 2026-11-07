@@ -10,7 +10,7 @@ from pytest_homeassistant_custom_component.common import async_capture_events
 from homeassistant.components.vacuum import DOMAIN as VACUUM_DOMAIN, VacuumEntityFeature
 from homeassistant.const import EVENT_CALL_SERVICE
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ServiceValidationError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
@@ -229,30 +229,60 @@ async def test_set_fan_speed_unknown_value(hass: HomeAssistant, build_device) ->
     assert calls == []
 
 
-@pytest.mark.parametrize("value", ["cleaning", "paused"])
-async def test_set_fan_speed_refused_during_customised_run(
-    hass: HomeAssistant, build_device, value: str
+async def test_fan_speed_hidden_in_customised_mode(
+    hass: HomeAssistant, build_device
 ) -> None:
     entry, calls = await _setup(hass, build_device)
-    hass.states.async_set(VACUUM, value)
+    entity_id = _vacuum(hass, entry)
+
+    hass.states.async_set(sensor_id("mode"), "Custom")
+    await hass.async_block_till_done()
+    state = hass.states.get(entity_id)
+    assert state.attributes["supported_features"] == FEATURES & ~VacuumEntityFeature.FAN_SPEED
+    assert "fan_speed" not in state.attributes
+    # Der Dienst lehnt ab, weil das Feature fehlt.
+    with pytest.raises(HomeAssistantError):
+        await _call(hass, "set_fan_speed", entity_id, fan_speed="max")
+    assert calls == []
+
+    hass.states.async_set(sensor_id("mode"), "SweepFirst")
+    await hass.async_block_till_done()
+    state = hass.states.get(entity_id)
+    assert state.attributes["supported_features"] == FEATURES
+    assert state.attributes["fan_speed"] == "quiet"
+
+
+async def test_set_fan_speed_refused_in_customised_mode(
+    hass: HomeAssistant, build_device
+) -> None:
+    """Direkter Aufruf, auch wenn der Modus gerade erst gewechselt hat."""
+    entry, calls = await _setup(hass, build_device)
+    entity = hass.data[VACUUM_DOMAIN].get_entity(_vacuum(hass, entry))
     hass.states.async_set(sensor_id("mode"), "Custom")
     with pytest.raises(ServiceValidationError) as err:
-        await _call(hass, "set_fan_speed", _vacuum(hass, entry), fan_speed="max")
+        await entity.async_set_fan_speed("max")
     assert err.value.translation_key == "fan_speed_customised"
     assert calls == []
 
 
-@pytest.mark.parametrize(
-    ("vacuum_state", "mode"), [("cleaning", "OnlySweep"), ("docked", "Custom")]
-)
-async def test_set_fan_speed_allowed_otherwise(
-    hass: HomeAssistant, build_device, vacuum_state: str, mode: str
+async def test_set_fan_speed_while_cleaning_in_other_mode(
+    hass: HomeAssistant, build_device
 ) -> None:
     entry, calls = await _setup(hass, build_device)
-    hass.states.async_set(VACUUM, vacuum_state)
-    hass.states.async_set(sensor_id("mode"), mode)
+    hass.states.async_set(VACUUM, "cleaning")
     await _call(hass, "set_fan_speed", _vacuum(hass, entry), fan_speed="max")
     assert _messages(calls) == [(notify_id("fan"), "[3]")]
+
+
+async def test_cleaning_mode_attribute(hass: HomeAssistant, build_device) -> None:
+    entry, _ = await _setup(hass, build_device)
+    entity_id = _vacuum(hass, entry)
+    assert hass.states.get(entity_id).attributes["cleaning_mode"] == "sweep"
+
+    for sensor, option in (("Custom", "custom"), ("BothWork", "both"), ("unknown", None)):
+        hass.states.async_set(sensor_id("mode"), sensor)
+        await hass.async_block_till_done()
+        assert hass.states.get(entity_id).attributes["cleaning_mode"] == option
 
 
 # --- Bereiche -------------------------------------------------------------
