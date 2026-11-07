@@ -85,6 +85,11 @@
         "name": "{room} reinigen"
       }
     },
+    "switch": {
+      "use_app_room_settings": {
+        "name": "Raumeinstellungen der App verwenden"
+      }
+    },
     "vacuum": {
       "vacuum": {
         "state_attributes": {
@@ -103,7 +108,7 @@
   "services": {
     "clean_rooms": {
       "name": "Räume reinigen",
-      "description": "Startet die Reinigung der genannten Räume im Modus „Personalisieren“. Es gelten die Raumeinstellungen aus der App. Die Reihenfolge der Namen ist die Reihenfolge der Reinigung.",
+      "description": "Startet die Reinigung der genannten Räume. Ist „Raumeinstellungen der App verwenden“ an (Standard), wechselt der Roboter in den Modus „Personalisieren“ und es gelten die Raumeinstellungen aus der App. Die Reihenfolge der Namen ist die Reihenfolge der Reinigung.",
       "fields": {
         "rooms": {
           "name": "Räume",
@@ -200,6 +205,9 @@
     },
     "unknown_fan_speed": {
       "message": "Unbekannte Saugleistung „{fan_speed}“. Mögliche Werte: {options}."
+    },
+    "custom_mode_with_global_settings": {
+      "message": "Der Reinigungsmodus steht auf „Personalisieren“. Einen anderen Reinigungsmodus wählen oder „Raumeinstellungen der App verwenden“ einschalten."
     },
     "fan_speed_customised": {
       "message": "Der Roboter reinigt im Modus „Personalisieren“ und nutzt für diesen Lauf die Raumeinstellungen aus der App. Die Saugleistung lässt sich jetzt nicht ändern."

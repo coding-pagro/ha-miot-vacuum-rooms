@@ -85,6 +85,11 @@
         "name": "Clean {room}"
       }
     },
+    "switch": {
+      "use_app_room_settings": {
+        "name": "Use room settings from the app"
+      }
+    },
     "vacuum": {
       "vacuum": {
         "state_attributes": {
@@ -103,7 +108,7 @@
   "services": {
     "clean_rooms": {
       "name": "Clean rooms",
-      "description": "Starts cleaning the named rooms in Customised mode. The per-room settings from the app apply. The order of the names is the cleaning order.",
+      "description": "Starts cleaning the named rooms. With \"Use room settings from the app\" on (default), the robot switches to Customised mode and the per-room settings from the app apply. The order of the names is the cleaning order.",
       "fields": {
         "rooms": {
           "name": "Rooms",
@@ -200,6 +205,9 @@
     },
     "unknown_fan_speed": {
       "message": "Unknown fan speed \"{fan_speed}\". Possible values: {options}."
+    },
+    "custom_mode_with_global_settings": {
+      "message": "The cleaning mode is set to Customised. Choose another cleaning mode or switch on \"Use room settings from the app\"."
     },
     "fan_speed_customised": {
       "message": "The robot is cleaning in Customised mode and uses the per-room settings from the app for this run. The fan speed cannot be changed now."

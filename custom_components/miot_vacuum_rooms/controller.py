@@ -88,6 +88,10 @@ class VacuumController:
             model="Vacuum Rooms",
             entry_type=DeviceEntryType.SERVICE,
         )
+        # Schalter "Raumeinstellungen der App verwenden"; der Schalter stellt
+        # seinen letzten Zustand beim Start wieder her (nicht in den Optionen,
+        # sonst würde jedes Umschalten den Eintrag neu laden).
+        self.use_app_room_settings: bool = True
 
     # --- Konfiguration -------------------------------------------------
 
@@ -184,10 +188,21 @@ class VacuumController:
                 translation_domain=DOMAIN, translation_key="mode_timeout"
             )
 
-    async def async_clean_rooms(self, names: list[str]) -> None:
-        """Startet die Reinigung der genannten Räume (Modus: Personalisieren).
+    def _check_global_mode(self) -> None:
+        """Ohne Raumeinstellungen der App darf der Modus nicht Personalisieren sein."""
+        if self.state("prop_mode") == SELECTS["mode"]["options"][MODE_CUSTOM][1]:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="custom_mode_with_global_settings",
+            )
 
-        Die Reihenfolge der Namen bestimmt die Reihenfolge der IDs in der Liste.
+    async def async_clean_rooms(self, names: list[str]) -> None:
+        """Startet die Reinigung der genannten Räume.
+
+        Mit use_app_room_settings (Standard) im Modus Personalisieren, es gelten
+        die Raumeinstellungen der App. Sonst bleibt der globale Modus wie er ist
+        (am Gerät ungetestet). Die Reihenfolge der Namen bestimmt die
+        Reihenfolge der IDs in der Liste.
         """
         try:
             room_ids = resolve_room_ids(self.rooms, names)
@@ -198,7 +213,10 @@ class VacuumController:
                 translation_placeholders={"room": str(err.args[0])},
             ) from err
         self._check_ready()
-        await self._async_ensure_custom_mode()
+        if self.use_app_room_settings:
+            await self._async_ensure_custom_mode()
+        else:
+            self._check_global_mode()
         await self.async_send(
             "act_start", build_start_message(CLEAN_TYPE_AREA, room_ids)
         )

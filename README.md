@@ -18,6 +18,7 @@ The integration's UI is available in English and German.
 |---|---|
 | Commands and values | Confirmed on a real **Jonr P20 Pro** (`xtl.vacuum.xm2216`) via the Xiaomi Home integration |
 | Room start `[3, "[ID]"]`, Customised mode | Confirmed on the device (per-room settings from the app apply) |
+| Room start with global settings (switch "Use room settings from the app" off) | **Untested** on the device |
 | Integration code | Tested in a Home Assistant test environment, **not yet installed in a live instance** |
 | Whole-floor service | **Untested**, command derived from app behaviour |
 | Other models | Unverified. They only work if they use the same MIoT specification (service 17) with the same numbers and values |
@@ -72,9 +73,16 @@ data:
 ```
 
 - The order of the names is the cleaning order.
-- The service switches to **Customised** mode and waits up to 10 seconds for confirmation. In this mode the **per-room settings from the app** apply (suction power, water level, passes per room). The global select entities have no effect on the run.
 - By default it only starts when the robot is on its dock (`docked`). Starting in the middle of a job made the robot lose its orientation. The condition can be switched off in the options.
-- The mode stays on Customised afterwards.
+
+The switch **"Use room settings from the app"** (on the integration's device, default on, survives restarts) decides which settings apply:
+
+| Switch | Behaviour |
+|---|---|
+| **On** (default) | The service switches to **Customised** mode and waits up to 10 seconds for confirmation. In this mode the **per-room settings from the app** apply (suction power, water level, passes per room). The global select entities have no effect on the run. The mode stays on Customised afterwards. |
+| **Off** | The mode is **not** changed. The **global** cleaning mode, suction power, water level and passes apply to the selected rooms. If the global mode is *Customised*, the start is refused: pick another cleaning mode first. **Untested on the device:** only the room start in Customised mode is confirmed so far. |
+
+The switch applies to everything that cleans rooms: `clean_rooms`, the room buttons, the start button of the vacuum entity and `vacuum.clean_area`.
 
 Every learned room also gets a "Clean …" button that calls the same service for that one room.
 
@@ -103,7 +111,7 @@ data:
 
 After learning or forgetting rooms (or changing room IDs in the options), Home Assistant shows a repair notice. Open it and check the mapping again. Renaming a room keeps the mapping, because it is stored by room ID.
 
-**Fan speed:** there are two suction power values. The **global** one (shown and set by the fan speed of this entity and by the "Suction power" select) and the **per-room** one from the app, which Home Assistant can neither read nor set. In *Customised* mode the robot uses the per-room value, so the fan speed of this entity has **no effect** on room cleaning in that mode. While a run in *Customised* mode is active, changing the fan speed is refused.
+**Fan speed:** there are two suction power values. The **global** one (shown and set by the fan speed of this entity and by the "Suction power" select) and the **per-room** one from the app, which Home Assistant can neither read nor set. In *Customised* mode the robot uses the per-room value, so the fan speed of this entity only matters for room cleaning when **"Use room settings from the app" is off** (see Cleaning rooms). With the switch on, it has no effect on room cleaning. While a run in *Customised* mode is active, changing the fan speed is refused.
 
 **Tip:** the Xiaomi vacuum entity is no longer needed on dashboards. You can hide it: Settings → Entities → select the Xiaomi vacuum → settings → *Visible* off. Do not disable or delete it, this integration reads its state and sends commands through it.
 
