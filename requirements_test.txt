@@ -1,0 +1,5 @@
+# Test environment for the current Home Assistant release (2026.10.4).
+# Each release of pytest-homeassistant-custom-component pins exactly one
+# Home Assistant version. The minimum version is tested in CI only
+# (see .github/workflows/tests.yml). Requires Python 3.14.
+pytest-homeassistant-custom-component==0.13.375

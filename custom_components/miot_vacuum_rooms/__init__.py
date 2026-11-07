@@ -15,7 +15,7 @@ from .controller import MiotVacuumConfigEntry, VacuumController
 from .const import DOMAIN
 from .services import async_register_services
 
-PLATFORMS = [Platform.SELECT, Platform.BUTTON]
+PLATFORMS = [Platform.SWITCH, Platform.SELECT, Platform.BUTTON, Platform.VACUUM]
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
