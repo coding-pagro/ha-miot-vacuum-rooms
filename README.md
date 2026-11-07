@@ -109,7 +109,7 @@ data:
     - hallway
 ```
 
-After learning or forgetting rooms (or changing room IDs in the options), Home Assistant shows a repair notice. Open it and check the mapping again. Renaming a room keeps the mapping, because it is stored by room ID.
+If the set of room IDs changes after you mapped the areas (learning a new room, forgetting one, or editing the IDs in the options), Home Assistant shows a repair notice. Open it and check the mapping again. Renaming a room keeps the mapping, because it is stored by room ID.
 
 **Fan speed:** there are two suction power values. The **global** one (shown and set by the fan speed of this entity and by the "Suction power" select) and the **per-room** one from the app, which Home Assistant can neither read nor set. In *Customised* mode the robot uses the per-room value, so the fan speed of this entity only matters for room cleaning when **"Use room settings from the app" is off** (see Cleaning rooms). With the switch on, it has no effect on room cleaning. While a run in *Customised* mode is active, changing the fan speed is refused.
 
@@ -172,6 +172,6 @@ uv venv --python 3.14 ~/.venvs/miot-vacuum-rooms
 uv pip install --python ~/.venvs/miot-vacuum-rooms -r requirements_test.txt
 ```
 
-Then set `MIOT_WSL_VENV=/home/<user>/.venvs/miot-vacuum-rooms` on Windows. A venv in your Linux home is much faster than one on the Windows drive and works for all checkouts.
+Then set `MIOT_WSL_VENV=/home/<user>/.venvs/miot-vacuum-rooms` on Windows. A venv in your Linux home is much faster than one on the Windows drive and works for all checkouts. In git worktrees `MIOT_WSL_VENV` is required, because a `.venv-wsl/` only exists in the checkout where it was created.
 
 **CI:** `.github/workflows/tests.yml` runs the tests on every push and pull request against the minimum (2026.3.x) and the current (2026.10.x) Home Assistant version.

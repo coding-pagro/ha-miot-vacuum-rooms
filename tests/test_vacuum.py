@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 from pytest_homeassistant_custom_component.common import async_capture_events
 
@@ -221,8 +223,9 @@ async def test_set_fan_speed_sends_global_value(
 
 async def test_set_fan_speed_unknown_value(hass: HomeAssistant, build_device) -> None:
     entry, calls = await _setup(hass, build_device)
-    with pytest.raises(ServiceValidationError):
+    with pytest.raises(ServiceValidationError) as err:
         await _call(hass, "set_fan_speed", _vacuum(hass, entry), fan_speed="turbo")
+    assert err.value.translation_key == "unknown_fan_speed"
     assert calls == []
 
 
@@ -300,8 +303,9 @@ async def test_clean_area_requires_dock(hass: HomeAssistant, build_device) -> No
     kitchen = ar.async_get(hass).async_create("Kitchen").id
     _set_registry_options(hass, entity_id, area_mapping={kitchen: ["4"]})
     hass.states.async_set(VACUUM, "cleaning")
-    with pytest.raises(ServiceValidationError):
+    with pytest.raises(ServiceValidationError) as err:
         await _call(hass, "clean_area", entity_id, cleaning_area_id=[kitchen])
+    assert err.value.translation_key == "not_docked"
     assert calls == []
 
 
@@ -313,10 +317,21 @@ async def _reload(hass: HomeAssistant, entry) -> None:
     await hass.async_block_till_done()
 
 
+def _assert_added(hass: HomeAssistant, entity_id: str) -> None:
+    """Die Prüfung läuft beim Hinzufügen; ein Fehler dort ließe die Entität weg."""
+    assert hass.states.get(entity_id).state == "docked"
+
+
 async def test_no_issue_without_mapping(hass: HomeAssistant, build_device) -> None:
     entry, _ = await _setup(hass, build_device)
-    await _reload(hass, entry)
-    assert _segments_issue(hass, _vacuum(hass, entry)) is None
+    entity_id = _vacuum(hass, entry)
+    # Raum-IDs ändern sich, aber ohne gespeicherte Zuordnung gibt es nichts zu melden.
+    await hass.services.async_call(
+        DOMAIN, "forget_room", {"name": "Flur"}, blocking=True
+    )
+    await hass.async_block_till_done()
+    _assert_added(hass, entity_id)
+    assert _segments_issue(hass, entity_id) is None
 
 
 async def test_no_issue_when_ids_equal(hass: HomeAssistant, build_device) -> None:
@@ -324,6 +339,7 @@ async def test_no_issue_when_ids_equal(hass: HomeAssistant, build_device) -> Non
     entity_id = _vacuum(hass, entry)
     _set_registry_options(hass, entity_id, last_seen_segments=_last_seen(ROOMS))
     await _reload(hass, entry)
+    _assert_added(hass, entity_id)
     assert _segments_issue(hass, entity_id) is None
 
 
@@ -333,6 +349,46 @@ async def test_no_issue_on_rename(hass: HomeAssistant, build_device) -> None:
     renamed = {f"{name} (old)": room_id for name, room_id in ROOMS.items()}
     _set_registry_options(hass, entity_id, last_seen_segments=_last_seen(renamed))
     await _reload(hass, entry)
+    _assert_added(hass, entity_id)
+    assert _segments_issue(hass, entity_id) is None
+
+
+async def test_issue_when_room_learned(hass: HomeAssistant, build_device) -> None:
+    entry, _ = await _setup(hass, build_device)
+    entity_id = _vacuum(hass, entry)
+    _set_registry_options(hass, entity_id, last_seen_segments=_last_seen(ROOMS))
+    await hass.async_block_till_done()
+
+    task = hass.async_create_task(
+        hass.services.async_call(
+            DOMAIN, "learn_room", {"name": "Bad", "timeout": 10}, blocking=True
+        )
+    )
+    await asyncio.sleep(0.05)
+    hass.states.async_set(sensor_id("values"), "[7]")
+    await asyncio.wait_for(task, 5)
+    await hass.async_block_till_done()
+    assert _segments_issue(hass, entity_id) is not None
+
+
+async def test_stale_issue_cleared_when_ids_match_again(
+    hass: HomeAssistant, build_device
+) -> None:
+    entry, _ = await _setup(hass, build_device)
+    entity_id = _vacuum(hass, entry)
+    _set_registry_options(hass, entity_id, last_seen_segments=_last_seen(ROOMS))
+    await hass.async_block_till_done()
+
+    await hass.services.async_call(
+        DOMAIN, "forget_room", {"name": "Flur"}, blocking=True
+    )
+    await hass.async_block_till_done()
+    assert _segments_issue(hass, entity_id) is not None
+
+    # Raum wieder eintragen: die IDs passen wieder zur gespeicherten Zuordnung.
+    hass.config_entries.async_update_entry(entry, options={**entry.options, "rooms": ROOMS})
+    await hass.async_block_till_done()
+    _assert_added(hass, entity_id)
     assert _segments_issue(hass, entity_id) is None
 
 

@@ -89,6 +89,11 @@ def find_wsl_venv() -> tuple[str | None, str]:
 
 def wsl_mode(venv: str, reason: str, pytest_args: list[str]) -> int:
     say(f"mode: WSL ({reason})")
+    probe = ["wsl", "-e", f"{venv}/bin/python", "-c", "import pytest_homeassistant_custom_component"]
+    if output(probe)[0] != 0:
+        say("pytest-homeassistant-custom-component is not installed in that venv. Inside WSL:")
+        say(f"  uv pip install --python {venv} -r requirements_test.txt")
+        return 2
     cmd = ["wsl", "--cd", str(ROOT), "-e", f"{venv}/bin/python", "-m", "pytest"]
     return run([*cmd, *pytest_args]).returncode
 
@@ -133,8 +138,10 @@ def ci_mode(reason: str, pytest_args: list[str]) -> int:
         say("GitHub CLI (gh) is missing. Install it and run 'gh auth login'.")
         return 2
 
-    code, branch = output(["git", "rev-parse", "--abbrev-ref", "HEAD"])
-    if code != 0 or not branch or branch == "HEAD":
+    # symbolic-ref instead of rev-parse --abbrev-ref: that one yields
+    # "heads/main" if a tag "main" exists, which would slip past the check.
+    code, branch = output(["git", "symbolic-ref", "--short", "-q", "HEAD"])
+    if code != 0 or not branch:
         say("no branch checked out (detached HEAD). Switch to a feature branch.")
         return 2
     protected = {"main", "master"}

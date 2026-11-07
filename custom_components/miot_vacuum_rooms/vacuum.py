@@ -6,6 +6,7 @@ import logging
 from typing import Any
 
 from homeassistant.components.vacuum import (
+    DOMAIN as VACUUM_DOMAIN,
     Segment,
     StateVacuumEntity,
     VacuumActivity,
@@ -13,11 +14,15 @@ from homeassistant.components.vacuum import (
 )
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.exceptions import ServiceValidationError
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_state_change_event
 
 from .const import DOMAIN, MODE_CUSTOM, SELECTS
-from .controller import MiotVacuumConfigEntry, VacuumController
+from .controller import _UNAVAILABLE, MiotVacuumConfigEntry, VacuumController
+
+# Schlüssel der Reparaturmeldung in Core (homeassistant.components.vacuum)
+ISSUE_SEGMENTS_CHANGED = "segments_changed"
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -34,7 +39,6 @@ _ACTIVITIES = {
         VacuumActivity.ERROR,
     )
 }
-_UNAVAILABLE = (None, "unknown", "unavailable")
 # Zustände der Quelle, in denen ein Auftrag läuft
 _RUNNING = ("cleaning", "paused")
 
@@ -190,3 +194,12 @@ class MiotRoomsVacuum(StateVacuumEntity):
         current = {segment.id for segment in self._segments()}
         if {segment.id for segment in last_seen} != current:
             self.async_create_segments_issue()
+        else:
+            # Eine frühere Instanz kann die Meldung erzeugt haben (z. B. Raum
+            # angelernt und wieder entfernt). Core löscht sie nur aus der
+            # Instanz, die sie erzeugt hat.
+            ir.async_delete_issue(
+                self.hass,
+                VACUUM_DOMAIN,
+                f"{ISSUE_SEGMENTS_CHANGED}_{self.registry_entry.id}",
+            )
