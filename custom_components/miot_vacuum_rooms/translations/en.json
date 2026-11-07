@@ -207,6 +207,12 @@
     "entry_required": {
       "message": "Several vacuums are set up. Please provide entry_id."
     },
+    "job_pending": {
+      "message": "A cleaning job is still running or paused (status: {status}), even if the vacuum is on its dock. Start aborted. Wait until the job has finished, or end it in the app."
+    },
+    "paused_at_base": {
+      "message": "The current job is paused while the vacuum is on its dock (status: {status}). Resume or end it in the app."
+    },
     "no_rooms": {
       "message": "No rooms have been learned yet. Learn rooms first; the vacuum never starts without a room selection."
     },

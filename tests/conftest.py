@@ -22,6 +22,7 @@ NOTIFY = {
 }
 SENSOR = {
     "values": "clean_values_p_17_34",
+    "task": "clean_type_status_p_17_9",
     "mode": "clean_mode_p_17_10",
     "fan": "fan_mode_p_17_13",
     "count": "clean_count_p_17_14",
@@ -86,6 +87,7 @@ def build_device(hass: HomeAssistant):
         hass.states.async_set(sensor_id("count"), "Once")
         hass.states.async_set(sensor_id("route"), "Fine")
         hass.states.async_set(sensor_id("values"), "")
+        hass.states.async_set(sensor_id("task"), "Idle")
         return VACUUM
 
     return _build

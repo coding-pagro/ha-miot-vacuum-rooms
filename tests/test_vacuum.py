@@ -107,6 +107,40 @@ async def test_activity_follows_source(hass: HomeAssistant, build_device) -> Non
     assert hass.states.get(entity_id).state == "unknown"
 
 
+@pytest.mark.parametrize(
+    ("source", "task", "expected"),
+    [
+        ("docked", "Area Pause", "paused"),  # Mopp waschen / zurückgeschickt
+        ("docked", "Full Pause", "paused"),
+        ("docked", "Idle", "docked"),
+        ("returning", "Area Pause", "returning"),
+        ("cleaning", "Area Resume", "cleaning"),
+    ],
+)
+async def test_activity_with_job_status(
+    hass: HomeAssistant, build_device, source: str, task: str, expected: str
+) -> None:
+    entry, _ = await _setup(hass, build_device)
+    hass.states.async_set(VACUUM, source)
+    hass.states.async_set(sensor_id("task"), task)
+    await hass.async_block_till_done()
+    assert hass.states.get(_vacuum(hass, entry)).state == expected
+
+
+async def test_start_refused_when_paused_at_base(
+    hass: HomeAssistant, build_device
+) -> None:
+    """Neuer Raumstart würde ignoriert, Fortsetzen aus der Station ist ungeprüft."""
+    entry, calls = await _setup(hass, build_device)
+    hass.states.async_set(sensor_id("task"), "Area Pause")
+    events = async_capture_events(hass, EVENT_CALL_SERVICE)
+    with pytest.raises(ServiceValidationError) as err:
+        await _call(hass, "start", _vacuum(hass, entry))
+    assert err.value.translation_key == "paused_at_base"
+    assert calls == []
+    assert _source_calls(events) == []
+
+
 @pytest.mark.parametrize("value", ["unavailable", "unknown"])
 async def test_unavailable_with_source(
     hass: HomeAssistant, build_device, value: str

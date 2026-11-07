@@ -207,6 +207,12 @@
     "entry_required": {
       "message": "Es sind mehrere Saugroboter eingerichtet. Bitte entry_id angeben."
     },
+    "job_pending": {
+      "message": "Ein Reinigungsauftrag läuft noch oder ist pausiert (Status: {status}), auch wenn der Saugroboter in der Station steht. Start abgebrochen. Warten, bis der Auftrag fertig ist, oder ihn in der App beenden."
+    },
+    "paused_at_base": {
+      "message": "Der aktuelle Auftrag ist pausiert, während der Saugroboter in der Station steht (Status: {status}). In der App fortsetzen oder beenden."
+    },
     "no_rooms": {
       "message": "Es sind noch keine Räume angelernt. Zuerst Räume anlernen; ohne Raumauswahl startet der Saugroboter nie."
     },

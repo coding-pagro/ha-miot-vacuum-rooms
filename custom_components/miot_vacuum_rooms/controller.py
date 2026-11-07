@@ -22,6 +22,8 @@ from .const import (
     DOMAIN,
     MODE_CUSTOM,
     SELECTS,
+    TASK_IDLE,
+    TASK_PAUSE_SUFFIX,
     WAIT_MODE_SECONDS,
 )
 from .util import (
@@ -165,12 +167,33 @@ class VacuumController:
             raise ServiceValidationError(
                 translation_domain=DOMAIN, translation_key="vacuum_unavailable"
             )
-        if self.require_docked and state != "docked":
+        if not self.require_docked:
+            return
+        if state != "docked":
             raise ServiceValidationError(
                 translation_domain=DOMAIN,
                 translation_key="not_docked",
                 translation_placeholders={"state": str(state)},
             )
+        # "docked" kommt auch mitten im Auftrag (Mopp waschen). Nur ein
+        # Auftragsstatus "Idle" heißt, dass kein Auftrag offen ist.
+        if self.job_pending:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="job_pending",
+                translation_placeholders={"status": str(self.state("prop_task"))},
+            )
+
+    @property
+    def job_pending(self) -> bool:
+        """Ein Auftrag läuft oder ist pausiert (Status bekannt und nicht Idle)."""
+        task = self.state("prop_task")
+        return task not in _UNAVAILABLE and task != TASK_IDLE
+
+    @property
+    def job_paused(self) -> bool:
+        task = self.state("prop_task")
+        return task is not None and task.endswith(TASK_PAUSE_SUFFIX)
 
     async def _async_ensure_custom_mode(self) -> None:
         target = SELECTS["mode"]["options"][MODE_CUSTOM][1]

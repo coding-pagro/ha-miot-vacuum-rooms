@@ -39,6 +39,8 @@ _ACTIVITIES = {
         VacuumActivity.ERROR,
     )
 }
+_AT_BASE = ("docked", "idle")
+
 _BASE_FEATURES = (
     VacuumEntityFeature.STATE
     | VacuumEntityFeature.START
@@ -86,7 +88,7 @@ class MiotRoomsVacuum(StateVacuumEntity):
         self._async_check_segments_changed()
         tracked = [
             entity_id
-            for role in ("vacuum", "prop_fan", "prop_mode")
+            for role in ("vacuum", "prop_fan", "prop_mode", "prop_task")
             if (entity_id := self._controller.entity_id(role)) is not None
         ]
         self._update()
@@ -106,6 +108,10 @@ class MiotRoomsVacuum(StateVacuumEntity):
         state = self._controller.state("vacuum")
         self._attr_available = state not in _UNAVAILABLE
         self._attr_activity = _ACTIVITIES.get(state) if state else None
+        # In der Station, aber der Auftrag ist nur pausiert (Mopp waschen,
+        # oder pausiert und zurückgeschickt): als pausiert zeigen.
+        if state in _AT_BASE and self._controller.job_paused:
+            self._attr_activity = VacuumActivity.PAUSED
         if state not in _UNAVAILABLE and state not in _ACTIVITIES:
             if state not in self._logged_states:
                 self._logged_states.add(state)
@@ -129,9 +135,21 @@ class MiotRoomsVacuum(StateVacuumEntity):
 
     async def async_start(self) -> None:
         """Pausiert: fortsetzen. Sonst alle angelernten Räume reinigen."""
-        if self._controller.state("vacuum") == VacuumActivity.PAUSED:
+        state = self._controller.state("vacuum")
+        if state == VacuumActivity.PAUSED:
             await self._controller.async_vacuum_command("start")
             return
+        if state in _AT_BASE and self._controller.job_paused:
+            # Fortsetzen aus der Station ist am Gerät ungeprüft (der Xiaomi-
+            # Start könnte einen neuen Auftrag beginnen). Ein neuer Raumstart
+            # würde ignoriert. Deshalb klar ablehnen.
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="paused_at_base",
+                translation_placeholders={
+                    "status": str(self._controller.state("prop_task"))
+                },
+            )
         rooms = list(self._controller.rooms)
         if not rooms:
             raise ServiceValidationError(

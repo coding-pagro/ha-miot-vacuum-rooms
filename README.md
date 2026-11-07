@@ -29,7 +29,8 @@ The integration's UI is available in English and German.
 - Official Xiaomi Home integration set up with the robot vacuum
 - The device has entities with these suffixes (service 17):
   - Actions (`notify`): `a_17_1`, `a_17_26`, `a_17_27`, `a_17_28`, `a_17_46`, `a_17_50`
-  - Sensors (`sensor`): `p_17_10`, `p_17_13`, `p_17_14`, `p_17_34`, `p_17_65`
+  - Sensors (`sensor`): `p_17_9`, `p_17_10`, `p_17_13`, `p_17_14`, `p_17_34`, `p_17_65`
+- Existing setups pick up sensors added in later versions (such as `p_17_9`) automatically on the next start.
 - If one of them is missing, the setup names it.
 
 ## Installation
@@ -73,7 +74,7 @@ data:
 ```
 
 - The order of the names is the cleaning order.
-- By default it only starts when the robot is on its dock (`docked`). Starting in the middle of a job made the robot lose its orientation. The condition can be switched off in the options.
+- By default it only starts when the robot is on its dock (`docked`) **and no job is open** (job status `p_17_9` is `Idle`). Starting in the middle of a job made the robot lose its orientation. The robot also reports `docked` in the middle of a job, when it returns to wash the mop (job status `Area Pause`), and a robot with a paused job ignores new room starts. The condition can be switched off in the options.
 
 The switch **"Use room settings from the app"** (on the integration's device, default on, survives restarts) decides which settings apply:
 
@@ -88,12 +89,12 @@ Every learned room also gets a "Clean …" button that calls the same service fo
 
 ## Vacuum entity
 
-The integration adds its own vacuum entity (`vacuum.<device>`) to its device. It mirrors the state of the Xiaomi vacuum and is unavailable when that one is. The Xiaomi entity starts without a room selection, with whatever global mode is set, and even in the middle of a job. This entity does not:
+The integration adds its own vacuum entity (`vacuum.<device>`) to its device. It mirrors the state of the Xiaomi vacuum and is unavailable when that one is. One difference: when the robot is on its dock but the job is only paused (job status ends in `Pause`), it shows **Paused** instead of Docked. The Xiaomi entity starts without a room selection, with whatever global mode is set, and even in the middle of a job. This entity does not:
 
 | Button / action | What happens |
 |---|---|
-| Start | Robot **paused**: resumes the paused run. Otherwise: cleans **all learned rooms** like `clean_rooms` (same dock check). Without learned rooms it refuses. It never starts a run without a room selection. |
-| Pause, stop, return to base | Passed through to the Xiaomi vacuum. |
+| Start | Robot **paused** away from the dock: resumes the paused run. Job **paused on the dock** (after "return to base" during a run, or while the mop is washed): refuses, resume or end the job in the app (resuming from the dock is untested). Otherwise: cleans **all learned rooms** like `clean_rooms` (same dock check). Without learned rooms it refuses. It never starts a run without a room selection. |
+| Pause, stop, return to base | Passed through to the Xiaomi vacuum. **Stop** on the Jonr P20 Pro does **not** end a paused job (tested); end it in the app. |
 | Fan speed | Global suction power, see below. Hidden while the cleaning mode is *Customised*. |
 | `vacuum.clean_area` | Cleans the rooms mapped to the given areas, in the given order. |
 
