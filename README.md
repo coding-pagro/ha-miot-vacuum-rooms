@@ -161,10 +161,10 @@ It picks the mode from the environment and prints which one it chose and why. Th
 | Environment | Mode |
 |---|---|
 | Linux, macOS | Runs `python -m pytest` locally. Needs a venv with `requirements_test.txt` installed (`python3.14 -m venv .venv && .venv/bin/pip install -r requirements_test.txt`). |
-| Windows with WSL | Runs the tests inside WSL with the venv from the environment variable `MIOT_WSL_VENV` (a Linux path) or `.venv-wsl/` in the repository. |
+| Windows with WSL | Runs the tests inside WSL with the venv from the environment variable `MIOT_WSL_VENV` (a Linux path) or `.venv-wsl/` in the repository. If `requirements_test.txt` changed since the last run, it updates the venv first (with `uv` inside WSL). |
 | Windows without WSL | **CI mode:** pushes the current branch and waits for the GitHub Actions run of this commit (needs a logged-in `gh`). It refuses to run on `main` or with uncommitted changes, because CI only tests commits. On failure it prints the failed log. |
 
-Setting up the WSL venv (once, inside WSL, from the repository folder):
+Setting up the WSL venv (once, inside WSL, from the repository folder; later updates happen automatically):
 
 ```
 curl -LsSf https://astral.sh/uv/install.sh | sh

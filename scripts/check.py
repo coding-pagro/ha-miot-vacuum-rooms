@@ -6,6 +6,8 @@ Modes, chosen by environment:
 * Linux/macOS: ``python -m pytest`` locally.
 * Windows with WSL and a test venv inside WSL: pytest through ``wsl``.
   The venv is ``$MIOT_WSL_VENV`` (a Linux path) or ``.venv-wsl`` in the repo.
+  When requirements_test.txt changed since the last run, the venv is updated
+  first (with uv inside WSL).
 * Windows without a Linux environment: CI mode. Pushes the current branch
   and waits for the GitHub Actions run of this commit.
 
@@ -15,6 +17,7 @@ The exit code is the test result. Standard library only.
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import os
 import shutil
@@ -27,6 +30,8 @@ ROOT = Path(__file__).resolve().parent.parent
 WORKFLOW = "tests.yml"
 WSL_VENV_ENV = "MIOT_WSL_VENV"
 WSL_VENV_DIR = ".venv-wsl"
+REQUIREMENTS = "requirements_test.txt"
+REQUIREMENTS_STAMP = ".miot-requirements.sha256"
 RUN_WAIT_SECONDS = 90
 RUN_POLL_SECONDS = 5
 
@@ -87,12 +92,43 @@ def find_wsl_venv() -> tuple[str | None, str]:
     )
 
 
+def requirements_hash() -> str:
+    """Hash of requirements_test.txt, independent of CRLF/LF line endings."""
+    text = (ROOT / REQUIREMENTS).read_bytes().replace(b"\r\n", b"\n")
+    return hashlib.sha256(text).hexdigest()
+
+
+def sync_wsl_venv(venv: str) -> bool:
+    """Installs requirements_test.txt into the venv if it changed since the last run.
+
+    The hash of the installed file is kept in the venv (REQUIREMENTS_STAMP).
+    """
+    wanted = requirements_hash()
+    stamp = f"{venv}/{REQUIREMENTS_STAMP}"
+    _, current = output(["wsl", "-e", "cat", stamp])
+    probe = ["wsl", "-e", f"{venv}/bin/python", "-c", "import pytest_homeassistant_custom_component"]
+    if current == wanted and output(probe)[0] == 0:
+        return True
+
+    say(f"{REQUIREMENTS} changed since the last run, updating the venv")
+    # uv from the PATH or from its default install location
+    install = (
+        'UV=$(command -v uv || echo "$HOME/.local/bin/uv"); '
+        '"$UV" pip install --python "$1" -r "$2"'
+    )
+    cmd = ["wsl", "--cd", str(ROOT), "-e", "sh", "-c", install, "sh", venv, REQUIREMENTS]
+    if run(cmd).returncode != 0:
+        say("updating the venv failed. Inside WSL, from the repository folder:")
+        say(f"  uv pip install --python {venv} -r {REQUIREMENTS}")
+        return False
+    write = 'printf %s "$2" > "$1"'
+    output(["wsl", "-e", "sh", "-c", write, "sh", stamp, wanted])
+    return True
+
+
 def wsl_mode(venv: str, reason: str, pytest_args: list[str]) -> int:
     say(f"mode: WSL ({reason})")
-    probe = ["wsl", "-e", f"{venv}/bin/python", "-c", "import pytest_homeassistant_custom_component"]
-    if output(probe)[0] != 0:
-        say("pytest-homeassistant-custom-component is not installed in that venv. Inside WSL:")
-        say(f"  uv pip install --python {venv} -r requirements_test.txt")
+    if not sync_wsl_venv(venv):
         return 2
     cmd = ["wsl", "--cd", str(ROOT), "-e", f"{venv}/bin/python", "-m", "pytest"]
     return run([*cmd, *pytest_args]).returncode
