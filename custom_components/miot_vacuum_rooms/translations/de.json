@@ -84,6 +84,20 @@
       "room": {
         "name": "{room} reinigen"
       }
+    },
+    "vacuum": {
+      "vacuum": {
+        "state_attributes": {
+          "fan_speed": {
+            "state": {
+              "quiet": "Leise",
+              "standard": "Standard",
+              "strong": "Stark",
+              "max": "Max"
+            }
+          }
+        }
+      }
     }
   },
   "services": {
@@ -177,6 +191,18 @@
     },
     "entry_required": {
       "message": "Es sind mehrere Saugroboter eingerichtet. Bitte entry_id angeben."
+    },
+    "no_rooms": {
+      "message": "Es sind noch keine Räume angelernt. Zuerst Räume anlernen; ohne Raumauswahl startet der Saugroboter nie."
+    },
+    "unknown_segment": {
+      "message": "Segment {segment} ist kein angelernter Raum. Die Bereiche in den Einstellungen der Saugroboter-Entität neu zuordnen."
+    },
+    "unknown_fan_speed": {
+      "message": "Unbekannte Saugleistung „{fan_speed}“. Mögliche Werte: {options}."
+    },
+    "fan_speed_customised": {
+      "message": "Der Roboter reinigt im Modus „Personalisieren“ und nutzt für diesen Lauf die Raumeinstellungen aus der App. Die Saugleistung lässt sich jetzt nicht ändern."
     }
   }
 }

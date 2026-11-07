@@ -84,6 +84,20 @@
       "room": {
         "name": "Clean {room}"
       }
+    },
+    "vacuum": {
+      "vacuum": {
+        "state_attributes": {
+          "fan_speed": {
+            "state": {
+              "quiet": "Quiet",
+              "standard": "Standard",
+              "strong": "Strong",
+              "max": "Max"
+            }
+          }
+        }
+      }
     }
   },
   "services": {
@@ -177,6 +191,18 @@
     },
     "entry_required": {
       "message": "Several vacuums are set up. Please provide entry_id."
+    },
+    "no_rooms": {
+      "message": "No rooms have been learned yet. Learn rooms first; the vacuum never starts without a room selection."
+    },
+    "unknown_segment": {
+      "message": "Segment {segment} is not a learned room. Map the areas again in the vacuum entity settings."
+    },
+    "unknown_fan_speed": {
+      "message": "Unknown fan speed \"{fan_speed}\". Possible values: {options}."
+    },
+    "fan_speed_customised": {
+      "message": "The robot is cleaning in Customised mode and uses the per-room settings from the app for this run. The fan speed cannot be changed now."
     }
   }
 }

@@ -3,6 +3,7 @@
 Add-on integration for the **official Xiaomi Home integration** in Home Assistant. Some robot vacuums only show up there as raw MIoT entities (`notify.…_a_17_1`, `sensor.…_p_17_13`). This integration builds a usable interface on top of them, without the Xiaomi cloud map or extra credentials:
 
 - **Clean rooms by name**, also several rooms in a chosen order
+- **Own vacuum entity** with a safe start button, fan speed and **cleaning by Home Assistant areas** (`vacuum.clean_area`)
 - **Select entities** for cleaning mode, suction power, water level, passes and route preference
 - **One button per room**
 - **Learn rooms**: briefly start a room in the app, and the integration picks up its room ID
@@ -23,6 +24,7 @@ The integration's UI is available in English and German.
 
 ## Requirements
 
+- Home Assistant **2026.3.0** or later (first version with area cleaning for vacuums)
 - Official Xiaomi Home integration set up with the robot vacuum
 - The device has entities with these suffixes (service 17):
   - Actions (`notify`): `a_17_1`, `a_17_26`, `a_17_27`, `a_17_28`, `a_17_46`, `a_17_50`
@@ -75,6 +77,35 @@ data:
 - The mode stays on Customised afterwards.
 
 Every learned room also gets a "Clean …" button that calls the same service for that one room.
+
+## Vacuum entity
+
+The integration adds its own vacuum entity (`vacuum.<device>`) to its device. It mirrors the state of the Xiaomi vacuum and is unavailable when that one is. The Xiaomi entity starts without a room selection, with whatever global mode is set, and even in the middle of a job. This entity does not:
+
+| Button / action | What happens |
+|---|---|
+| Start | Robot **paused**: resumes the paused run. Otherwise: cleans **all learned rooms** like `clean_rooms` (same dock check). Without learned rooms it refuses. It never starts a run without a room selection. |
+| Pause, stop, return to base | Passed through to the Xiaomi vacuum. |
+| Fan speed | Global suction power, see below. |
+| `vacuum.clean_area` | Cleans the rooms mapped to the given areas, in the given order. |
+
+**Area cleaning:** open the vacuum entity → settings → map Home Assistant areas to the learned rooms. Then areas work in `vacuum.clean_area`, for example from the vacuum card or a voice assistant:
+
+```yaml
+action: vacuum.clean_area
+target:
+  entity_id: vacuum.my_vacuum
+data:
+  cleaning_area_id:
+    - kitchen
+    - hallway
+```
+
+After learning or forgetting rooms (or changing room IDs in the options), Home Assistant shows a repair notice. Open it and check the mapping again. Renaming a room keeps the mapping, because it is stored by room ID.
+
+**Fan speed:** there are two suction power values. The **global** one (shown and set by the fan speed of this entity and by the "Suction power" select) and the **per-room** one from the app, which Home Assistant can neither read nor set. In *Customised* mode the robot uses the per-room value, so the fan speed of this entity has **no effect** on room cleaning in that mode. While a run in *Customised* mode is active, changing the fan speed is refused.
+
+**Tip:** the Xiaomi vacuum entity is no longer needed on dashboards. You can hide it: Settings → Entities → select the Xiaomi vacuum → settings → *Visible* off. Do not disable or delete it, this integration reads its state and sends commands through it.
 
 ## Select entities
 

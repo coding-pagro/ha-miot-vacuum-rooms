@@ -140,6 +140,15 @@ class VacuumController:
             blocking=True,
         )
 
+    async def async_vacuum_command(self, service: str) -> None:
+        """Reicht start, pause, stop oder return_to_base an den Quell-Roboter durch."""
+        await self.hass.services.async_call(
+            "vacuum",
+            service,
+            {"entity_id": self._require_entity_id("vacuum")},
+            blocking=True,
+        )
+
     async def async_set_option(self, key: str, option: str) -> None:
         """Setzt Modus, Saugleistung, Nässe, Durchgänge oder Routenpräferenz."""
         spec = SELECTS[key]
