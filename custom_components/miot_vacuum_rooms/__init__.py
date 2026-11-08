@@ -16,6 +16,7 @@ from .services import async_register_services
 from .source_health import (
     async_delete_issues,
     async_heal_sources,
+    async_track_sources,
     async_update_issues,
 )
 
@@ -42,6 +43,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: MiotVacuumConfigEntry) -
     entry.runtime_data = VacuumController(hass, entry)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
+    entry.async_on_unload(async_track_sources(hass, entry))
     return True
 
 

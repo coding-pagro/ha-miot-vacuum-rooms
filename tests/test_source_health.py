@@ -2,14 +2,22 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
 from unittest.mock import patch
 
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.common import (
+    MockConfigEntry,
+    async_fire_time_changed,
+)
 
+from homeassistant.components.vacuum import DOMAIN as VACUUM_DOMAIN
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
+from homeassistant.util import dt as dt_util
 
+from custom_components.miot_vacuum_rooms import source_health
 from custom_components.miot_vacuum_rooms.const import CONF_ROOMS, CONF_SOURCES, DOMAIN
 from custom_components.miot_vacuum_rooms.discovery import discover_sources
 
@@ -350,5 +358,206 @@ async def test_remove_entry_deletes_issues(hass: HomeAssistant, build_device) ->
     assert await hass.config_entries.async_remove(entry.entry_id)
     await hass.async_block_till_done()
 
+    assert _issue(hass, "missing_sources", entry) is None
+    assert _issue(hass, "disabled_sources", entry) is None
+
+
+# --- Erneute Prüfung bei Registry-Änderungen ----------------------------
+
+
+async def _after_cooldown(hass: HomeAssistant) -> None:
+    """Spult über den Cooldown der Prüfung hinaus."""
+    async_fire_time_changed(
+        hass, dt_util.utcnow() + timedelta(seconds=source_health.CHECK_COOLDOWN + 1)
+    )
+    await hass.async_block_till_done()
+
+
+def _count_checks():
+    """Zählt Aufrufe der Heilung (die Prüfung ruft sie immer auf)."""
+    return patch.object(
+        source_health,
+        "async_heal_sources",
+        wraps=source_health.async_heal_sources,
+    )
+
+
+def _count_updates(hass: HomeAssistant):
+    return patch.object(
+        hass.config_entries,
+        "async_update_entry",
+        wraps=hass.config_entries.async_update_entry,
+    )
+
+
+def _own_vacuum(hass: HomeAssistant, entry: MockConfigEntry) -> str:
+    entity_id = er.async_get(hass).async_get_entity_id(
+        VACUUM_DOMAIN, DOMAIN, f"{entry.entry_id}_vacuum"
+    )
+    assert entity_id
+    return entity_id
+
+
+async def test_runtime_removal_creates_issue(hass: HomeAssistant, build_device) -> None:
+    build_device()
+    entry = await _setup_entry(hass, discover_sources(hass, VACUUM))
+
+    _remove(hass, sensor_id("values"))
+    await hass.async_block_till_done()
+    assert _issue(hass, "missing_sources", entry) is None  # noch im Cooldown
+
+    await _after_cooldown(hass)
+    issue = _issue(hass, "missing_sources", entry)
+    assert issue is not None
+    assert issue.translation_placeholders["entities"] == "sensor p_17_34"
+
+
+async def test_runtime_recreate_heals_and_reloads(
+    hass: HomeAssistant, build_device
+) -> None:
+    """Neu angelegt: geheilt, neu geladen, Meldung weg, die Entitäten folgen."""
+    build_device()
+    entry = await _setup_entry(hass, discover_sources(hass, VACUUM))
+    old = _remove(hass, sensor_id("error"))
+    await _after_cooldown(hass)
+    assert _issue(hass, "missing_sources", entry) is not None
+    controller = entry.runtime_data
+
+    new_id = _create(hass, old, state="7")
+    await _after_cooldown(hass)
+
+    assert entry.data[CONF_SOURCES]["prop_error"] == new_id
+    assert entry.state is ConfigEntryState.LOADED
+    assert entry.runtime_data is not controller  # neu geladen
+    assert _issue(hass, "missing_sources", entry) is None
+    # Die Saugroboter-Entität liest den Fehlercode der neuen Quelle
+    assert hass.states.get(_own_vacuum(hass, entry)).state == "error"
+
+
+async def test_runtime_disable_and_enable(hass: HomeAssistant, build_device) -> None:
+    """Deaktivieren/Aktivieren: Meldung kommt und geht, ohne Neuladen."""
+    build_device()
+    entry = await _setup_entry(hass, discover_sources(hass, VACUUM))
+    controller = entry.runtime_data
+    registry = er.async_get(hass)
+
+    with _count_updates(hass) as update:
+        registry.async_update_entity(
+            sensor_id("task"), disabled_by=er.RegistryEntryDisabler.USER
+        )
+        await _after_cooldown(hass)
+        issue = _issue(hass, "disabled_sources", entry)
+        assert issue is not None
+        assert issue.translation_placeholders["entities"] == sensor_id("task")
+
+        registry.async_update_entity(sensor_id("task"), disabled_by=None)
+        await _after_cooldown(hass)
+        assert _issue(hass, "disabled_sources", entry) is None
+
+    assert update.call_count == 0
+    assert entry.runtime_data is controller
+
+
+async def test_many_events_one_check(hass: HomeAssistant, build_device) -> None:
+    """Ein Update von Xiaomi Home mit vielen Neuanlagen: eine Prüfung, ein Neuladen."""
+    build_device()
+    entry = await _setup_entry(hass, discover_sources(hass, VACUUM))
+    keys = ("start", "fan", "water", "count", "mode", "route")
+
+    with _count_checks() as checks, _count_updates(hass) as update:
+        for key in keys:
+            _recreate(hass, notify_id(key))
+        await hass.async_block_till_done()
+        await _after_cooldown(hass)
+
+    # Nur die entprellte Prüfung (das Setup ruft die Heilung über __init__ auf)
+    assert checks.call_count == 1
+    assert update.call_count == 1
+    assert entry.state is ConfigEntryState.LOADED
+    for key in keys:
+        assert entry.runtime_data.entity_id(f"act_{key}") == notify_id(key)
+    assert _issue(hass, "missing_sources", entry) is None
+
+
+async def test_irrelevant_event_no_check(hass: HomeAssistant, build_device) -> None:
+    build_device()
+    await _setup_entry(hass, discover_sources(hass, VACUUM))
+    registry = er.async_get(hass)
+
+    with _count_checks() as checks:
+        other = registry.async_get_or_create("sensor", "other", "other-1")
+        registry.async_update_entity(other.entity_id, new_entity_id="sensor.renamed")
+        registry.async_remove("sensor.renamed")
+        # Quelle, aber eine Änderung ohne Belang
+        registry.async_update_entity(sensor_id("task"), name="Task")
+        await _after_cooldown(hass)
+
+    assert checks.call_count == 0
+
+
+async def test_no_check_after_unload(hass: HomeAssistant, build_device) -> None:
+    """Nach dem Entladen bleibt eine schon geplante Prüfung aus."""
+    build_device()
+    entry = await _setup_entry(hass, discover_sources(hass, VACUUM))
+
+    with _count_checks() as checks:
+        _remove(hass, sensor_id("values"))
+        await hass.async_block_till_done()
+        assert await hass.config_entries.async_unload(entry.entry_id)
+        await hass.async_block_till_done()
+        await _after_cooldown(hass)
+        _remove(hass, sensor_id("task"))
+        await _after_cooldown(hass)
+
+    assert checks.call_count == 0
+    assert _issue(hass, "missing_sources", entry) is None
+
+
+async def test_runtime_xiaomi_vacuum_recreated(
+    hass: HomeAssistant, build_device
+) -> None:
+    """Xiaomi Home legt die Vacuum-Entität (ohne Endung) neu an: geheilt."""
+    build_device()
+    entry = await _setup_entry(hass, discover_sources(hass, VACUUM))
+
+    old = _remove(hass, VACUUM)
+    new_id = _create(hass, old, state="docked")
+    await _after_cooldown(hass)
+
+    assert entry.data[CONF_SOURCES]["vacuum"] == new_id
+    assert entry.unique_id == new_id
+    assert entry.state is ConfigEntryState.LOADED
+    assert entry.runtime_data.entity_id("vacuum") == VACUUM
+    assert _issue(hass, "missing_sources", entry) is None
+
+
+async def test_runtime_new_entity_on_device_triggers_check(
+    hass: HomeAssistant, build_device
+) -> None:
+    """Eine neue Entität ohne Endung am Xiaomi-Gerät löst eine Prüfung aus."""
+    build_device()
+    await _setup_entry(hass, discover_sources(hass, VACUUM))
+
+    with _count_checks() as checks:
+        _add_vacuum(hass, "another")
+        await _after_cooldown(hass)
+
+    assert checks.call_count == 1
+
+
+async def test_runtime_rename_source(hass: HomeAssistant, build_device) -> None:
+    """Umbenennung einer Quelle: Prüfung läuft, nichts zu heilen, keine Meldung."""
+    build_device()
+    entry = await _setup_entry(hass, discover_sources(hass, VACUUM))
+
+    with _count_checks() as checks, _count_updates(hass) as update:
+        er.async_get(hass).async_update_entity(
+            sensor_id("task"), new_entity_id="sensor.renamed_task"
+        )
+        await _after_cooldown(hass)
+
+    assert checks.call_count == 1
+    assert update.call_count == 0
+    assert entry.runtime_data.entity_id("prop_task") == "sensor.renamed_task"
     assert _issue(hass, "missing_sources", entry) is None
     assert _issue(hass, "disabled_sources", entry) is None

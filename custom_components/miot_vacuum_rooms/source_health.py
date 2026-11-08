@@ -4,17 +4,32 @@ Die Quellen stehen als Registry-IDs in entry.data["sources"]. Legt Xiaomi
 Home eine Entität neu an, zeigt die gespeicherte ID ins Leere. Die Heilung
 sucht solche Rollen am Gerät neu (über die Endung, wie die Einrichtung).
 Was danach fehlt oder deaktiviert ist, erscheint als Reparaturmeldung.
+Beides läuft beim Laden und, entprellt, bei passenden Änderungen der
+Entity-Registry.
 """
 
 from __future__ import annotations
 
+import logging
+
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
+from homeassistant.helpers.debounce import Debouncer
 
-from .const import CONF_SOURCES, DOMAIN, OPTIONAL_ROLES, ROLES
+from .const import CONF_SOURCES, DOMAIN, OPTIONAL_ROLES, ROLES, SIID
 from .discovery import find_sources, find_vacuum, role_label
+from .util import parse_entity_suffix
+
+_LOGGER = logging.getLogger(__name__)
+
+# Ein Update von Xiaomi Home entfernt und erzeugt viele Entitäten kurz
+# hintereinander; die Prüfung läuft erst, wenn es ruhig geworden ist.
+CHECK_COOLDOWN = 5
+
+# Änderungen an einer Entität, die eine Prüfung auslösen
+_RELEVANT_CHANGES = frozenset({"disabled_by", "entity_id", "device_id"})
 
 ISSUE_MISSING_SOURCES = "missing_sources"
 ISSUE_DISABLED_SOURCES = "disabled_sources"
@@ -144,3 +159,81 @@ def async_delete_issues(hass: HomeAssistant, entry_id: str) -> None:
     """Entfernt beide Meldungen eines Eintrags."""
     for key in (ISSUE_MISSING_SOURCES, ISSUE_DISABLED_SOURCES):
         ir.async_delete_issue(hass, DOMAIN, issue_id(key, entry_id))
+
+
+@callback
+def async_track_sources(hass: HomeAssistant, entry: ConfigEntry) -> CALLBACK_TYPE:
+    """Prüft Quellen und Meldungen erneut, wenn sich die Entity-Registry ändert.
+
+    Relevant ist eine Entität, die eine aktuelle Quelle ist (bei "remove" über
+    ihre zuletzt bekannte Entitäts-ID), eine Endung _a_17_*/_p_17_* hat oder
+    (bei "create"/"update") am bekannten Xiaomi-Gerät hängt. Ein "update"
+    zählt nur, wenn disabled_by, entity_id oder device_id geändert wurde.
+    Ändert die Heilung den Eintrag, lädt ihn der Update-Listener neu.
+    Liefert die Funktion zum Abmelden.
+    """
+    registry = er.async_get(hass)
+    source_entity_ids: set[str] = set()
+    device_id: str | None = None
+
+    @callback
+    def _async_snapshot() -> None:
+        """Merkt sich Entitäts-IDs der Quellen und das Gerät."""
+        nonlocal device_id
+        source_entity_ids.clear()
+        for registry_id in entry.data[CONF_SOURCES].values():
+            if (registry_entry := registry.async_get(registry_id)) is not None:
+                source_entity_ids.add(registry_entry.entity_id)
+        if (found := async_find_device_id(hass, entry)) is not None:
+            device_id = found
+
+    @callback
+    def _async_check() -> None:
+        async_heal_sources(hass, entry)
+        async_update_issues(hass, entry)
+        _async_snapshot()
+
+    debouncer = Debouncer(
+        hass,
+        _LOGGER,
+        cooldown=CHECK_COOLDOWN,
+        immediate=False,
+        function=_async_check,
+    )
+
+    @callback
+    def _relevant(data: er.EventEntityRegistryUpdatedData) -> bool:
+        action = data["action"]
+        if action == "update" and not _RELEVANT_CHANGES & data["changes"].keys():
+            return False
+        entity_ids = {data["entity_id"], data.get("old_entity_id")}
+        if source_entity_ids & entity_ids:
+            return True
+        parsed = parse_entity_suffix(data["entity_id"])
+        if parsed is not None and parsed[1] == SIID:
+            return True
+        if action == "remove":
+            return False
+        registry_entry = registry.async_get(data["entity_id"])
+        if registry_entry is None:
+            return False
+        if registry_entry.id in entry.data[CONF_SOURCES].values():
+            return True
+        return device_id is not None and registry_entry.device_id == device_id
+
+    @callback
+    def _async_registry_updated(event: Event[er.EventEntityRegistryUpdatedData]) -> None:
+        if _relevant(event.data):
+            debouncer.async_schedule_call()
+
+    _async_snapshot()
+    unsubscribe = hass.bus.async_listen(
+        er.EVENT_ENTITY_REGISTRY_UPDATED, _async_registry_updated
+    )
+
+    @callback
+    def _async_stop() -> None:
+        unsubscribe()
+        debouncer.async_shutdown()
+
+    return _async_stop

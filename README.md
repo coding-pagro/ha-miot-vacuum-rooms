@@ -176,7 +176,7 @@ What cannot be fixed this way shows up under **Settings → System → Repairs**
 - **Source entities missing** (error): required sources that could not be found on the device, for example `sensor p_17_34`. Check in Xiaomi Home that the device and these entities still exist. If they do not come back, remove the vacuum from this integration and set it up again. A missing optional source (the stop-clean button) does not raise this message.
 - **Source entities disabled** (warning): sources that are disabled in Home Assistant, listed by entity ID. Enable them under Settings → Entities. The integration does not enable them by itself.
 
-Both messages disappear on their own once the cause is gone. They have no repair dialog.
+Both messages appear and disappear without a restart: the integration checks again a few seconds after a source entity, an entity with a matching number or an entity on the Xiaomi device is added, removed, renamed, enabled or disabled. If that check finds a replacement, the integration reloads itself. The messages have no repair dialog.
 
 ## Limitations
 
