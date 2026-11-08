@@ -98,8 +98,8 @@ MODE_CUSTOM = "custom"
 # Auftragsstatus (clean-type-status, p_17_9), am Gerät beobachtet:
 # Idle, Area Clean/Pause/Resume, Full Clean/Pause. Während eines Auftrags
 # meldet der Xiaomi-Saugroboter beim Mopp-Waschen "docked", der Auftrag
-# steht dann auf "... Pause". Nur "Idle" heißt: kein Auftrag offen.
-TASK_IDLE = "Idle"
+# steht dann auf "... Pause". Nur "Idle" (oder "None") heißt: kein Auftrag offen.
+TASK_IDLE = ("Idle", "None")
 TASK_PAUSE_SUFFIX = " Pause"
 
 SERVICE_CLEAN_ROOMS = "clean_rooms"

@@ -94,6 +94,7 @@
       "vacuum": {
         "state_attributes": {
           "fan_speed": {
+            "name": "Suction power",
             "state": {
               "quiet": "Quiet",
               "standard": "Standard",

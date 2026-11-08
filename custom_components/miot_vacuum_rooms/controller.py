@@ -188,7 +188,7 @@ class VacuumController:
     def job_pending(self) -> bool:
         """Ein Auftrag läuft oder ist pausiert (Status bekannt und nicht Idle)."""
         task = self.state("prop_task")
-        return task not in _UNAVAILABLE and task != TASK_IDLE
+        return task not in _UNAVAILABLE and task not in TASK_IDLE
 
     @property
     def job_paused(self) -> bool:

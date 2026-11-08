@@ -201,10 +201,13 @@ async def test_clean_rooms_job_check_off_with_dock_option(
     assert len(calls) == 1
 
 
-async def test_clean_rooms_without_job_status(hass: HomeAssistant, build_device) -> None:
-    """Unbekannter Auftragsstatus: Verhalten wie vor der neuen Rolle."""
+@pytest.mark.parametrize("task", ["unavailable", "None"])
+async def test_clean_rooms_without_job_status(
+    hass: HomeAssistant, build_device, task: str
+) -> None:
+    """Kein Auftrag ("None") oder Status unbekannt: Verhalten wie vorher."""
     _, calls = await _setup(hass, build_device)
-    hass.states.async_set(sensor_id("task"), "unavailable")
+    hass.states.async_set(sensor_id("task"), task)
     hass.states.async_set(sensor_id("mode"), "Custom")
     await hass.services.async_call(
         DOMAIN, "clean_rooms", {"rooms": ["Küche"]}, blocking=True
