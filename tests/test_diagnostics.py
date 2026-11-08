@@ -158,3 +158,17 @@ async def test_diagnostics_without_device(hass: HomeAssistant, build_device) -> 
     assert all(info["missing"] for info in result["sources"].values())
     assert result["issues"]["missing_sources"] is True
     _assert_no_secrets(result, sources, device)
+
+
+async def test_diagnostics_entry_not_loaded(hass: HomeAssistant, build_device) -> None:
+    """Entladen: ohne Controller, der Rest bleibt verfügbar."""
+    entry, sources, device = await _setup(hass, build_device)
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    await hass.async_block_till_done()
+
+    result = await diagnostics.async_get_config_entry_diagnostics(hass, entry)
+
+    assert result["controller"] is None
+    assert result["device"]["model"] == "xtl.vacuum.xm2216"
+    assert not any(info["missing"] for info in result["sources"].values())
+    _assert_no_secrets(result, sources, device)

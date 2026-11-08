@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import timedelta
 from unittest.mock import patch
 
+import pytest
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     async_fire_time_changed,
@@ -24,7 +25,12 @@ from custom_components.miot_vacuum_rooms.const import (
     CONF_SOURCES,
     DOMAIN,
 )
-from custom_components.miot_vacuum_rooms.discovery import discover_sources
+from custom_components.miot_vacuum_rooms.discovery import (
+    NoDeviceError,
+    discover_sources,
+    find_sources,
+    role_label,
+)
 
 from .conftest import VACUUM, button_id, notify_id, sensor_id
 
@@ -707,3 +713,82 @@ async def test_disabled_entry_has_no_issues(hass: HomeAssistant, build_device) -
     await hass.async_block_till_done()
     assert _issue(hass, "missing_sources", entry) is not None
     assert _issue(hass, "disabled_sources", entry) is not None
+
+
+# --- Weitere Randfälle -----------------------------------------------------
+
+
+def test_role_label() -> None:
+    assert role_label("vacuum") == "vacuum"
+    assert role_label("act_start") == "notify a_17_1"
+    assert role_label("prop_values") == "sensor p_17_34"
+    assert role_label("act_stop_clean") == "button a_17_3"
+
+
+async def test_find_sources_ignores_other_services(
+    hass: HomeAssistant, build_device
+) -> None:
+    """Endungen anderer Dienste (siid != 17) zählen nicht, auch bei gleicher Nummer."""
+    build_device(skip=("clean_values_p_17_34",))
+    registry = er.async_get(hass)
+    device_id = _device_id(hass)
+    registry.async_get_or_create(
+        "sensor", "xiaomi_home", "other-service", suggested_object_id="x_p_2_34",
+        device_id=device_id,
+    )
+
+    found, missing = find_sources(hass, device_id)
+
+    assert "prop_values" not in found
+    assert missing == ["sensor p_17_34"]
+
+
+async def test_discover_sources_without_device(hass: HomeAssistant) -> None:
+    registry = er.async_get(hass)
+    entity = registry.async_get_or_create("vacuum", "xiaomi_home", "no-device")
+    with pytest.raises(NoDeviceError):
+        discover_sources(hass, entity.entity_id)
+
+
+async def test_sources_without_vacuum_role(hass: HomeAssistant, build_device) -> None:
+    """Fehlt die Rolle vacuum ganz, wird das Gerät über eine andere Quelle gefunden."""
+    build_device()
+    sources = discover_sources(hass, VACUUM)
+    without_vacuum = {role: rid for role, rid in sources.items() if role != "vacuum"}
+
+    entry = await _setup_entry(hass, without_vacuum, unique_id=sources["vacuum"])
+
+    assert entry.data[CONF_SOURCES]["vacuum"] == sources["vacuum"]
+    assert _issue(hass, "missing_sources", entry) is None
+
+
+async def test_runtime_source_restored_with_same_id(
+    hass: HomeAssistant, build_device
+) -> None:
+    """Xiaomi Home legt eine entfernte Entität mit gleicher unique_id wieder an.
+
+    Home Assistant vergibt dann die alte Registry-ID: nichts zu heilen, die
+    Meldung verschwindet trotzdem.
+    """
+    build_device()
+    sources = discover_sources(hass, VACUUM)
+    entry = await _setup_entry(hass, sources)
+    old = _remove(hass, VACUUM)
+    await _after_cooldown(hass)
+    assert _issue(hass, "missing_sources", entry) is not None
+
+    with _count_updates(hass) as update:
+        restored = er.async_get(hass).async_get_or_create(
+            old.domain,
+            old.platform,
+            old.unique_id,
+            suggested_object_id=old.entity_id.split(".", 1)[1],
+            config_entry=hass.config_entries.async_get_entry(old.config_entry_id),
+            device_id=old.device_id,
+        )
+        hass.states.async_set(restored.entity_id, "docked")
+        await _after_cooldown(hass)
+
+    assert restored.id == sources["vacuum"]
+    assert update.call_count == 0
+    assert _issue(hass, "missing_sources", entry) is None
