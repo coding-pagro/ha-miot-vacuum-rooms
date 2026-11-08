@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import Callable
 
 from homeassistant.config_entries import ConfigEntry
@@ -38,6 +39,7 @@ from .util import (
 
 type MiotVacuumConfigEntry = ConfigEntry[VacuumController]
 
+_LOGGER = logging.getLogger(__name__)
 _UNAVAILABLE = (None, "unknown", "unavailable")
 
 
@@ -272,6 +274,9 @@ class VacuumController:
             or values_entity is None
             or self.state("prop_task") in _UNAVAILABLE
             or self.state("prop_values") in _UNAVAILABLE
+            # Offener Auftrag (nur ohne Docked-Prüfung möglich): "Status nicht
+            # Idle" sagt dann nichts über diesen Start aus.
+            or self.job_pending
         ):
             await self.async_send("act_start", message)
             return
@@ -289,6 +294,17 @@ class VacuumController:
             if await self._async_wait_until(
                 [task_entity, values_entity], accepted, START_CONFIRM_SECONDS
             ):
+                return
+            if self.job_pending:
+                # Der Roboter hat einen Auftrag übernommen, nur die Räume
+                # stimmen (noch) nicht. Nicht erneut senden, sonst Doppelstart.
+                _LOGGER.warning(
+                    "Roboter hat den Start übernommen (Status %s), clean-values "
+                    "zeigt aber %s statt %s. Kein erneutes Senden.",
+                    self.state("prop_task"),
+                    self.state("prop_values"),
+                    room_ids,
+                )
                 return
         raise HomeAssistantError(
             translation_domain=DOMAIN,

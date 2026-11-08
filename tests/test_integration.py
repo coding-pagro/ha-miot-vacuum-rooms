@@ -340,10 +340,10 @@ async def test_start_not_confirmed_after_three_attempts(
     assert len(_starts(calls)) == 3
 
 
-async def test_start_wrong_rooms_not_accepted(
+async def test_start_status_taken_but_rooms_differ_no_resend(
     hass: HomeAssistant, build_device, fast_confirm
 ) -> None:
-    """Status nicht Idle, aber falsche Räume: gilt nicht als übernommen."""
+    """Status nicht mehr Idle, Räume stimmen nicht: nicht erneut senden."""
 
     def _wrong_rooms(attempt: int) -> bool:
         hass.states.async_set(sensor_id("task"), "Area Clean")
@@ -352,11 +352,28 @@ async def test_start_wrong_rooms_not_accepted(
 
     _, calls = await _setup(hass, build_device, start_accepts=_wrong_rooms)
     hass.states.async_set(sensor_id("mode"), "Custom")
-    with pytest.raises(HomeAssistantError):
-        await hass.services.async_call(
-            DOMAIN, "clean_rooms", {"rooms": ["Flur"]}, blocking=True
-        )
-    assert len(_starts(calls)) == 3
+    await hass.services.async_call(
+        DOMAIN, "clean_rooms", {"rooms": ["Flur"]}, blocking=True
+    )
+    assert len(_starts(calls)) == 1
+
+
+async def test_start_with_open_job_sends_once(
+    hass: HomeAssistant, build_device, fast_confirm
+) -> None:
+    """Ohne Docked-Prüfung und mit offenem Auftrag wird nicht verifiziert."""
+    _, calls = await _setup(
+        hass,
+        build_device,
+        start_accepts=lambda n: False,
+        **{CONF_REQUIRE_DOCKED: False},
+    )
+    hass.states.async_set(sensor_id("mode"), "Custom")
+    hass.states.async_set(sensor_id("task"), "Area Clean")
+    await hass.services.async_call(
+        DOMAIN, "clean_rooms", {"rooms": ["Flur"]}, blocking=True
+    )
+    assert len(_starts(calls)) == 1
 
 
 async def test_start_without_sensor_sends_once(
