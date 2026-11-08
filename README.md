@@ -202,3 +202,19 @@ uv pip install --python ~/.venvs/miot-vacuum-rooms -r requirements_test.txt
 Then set `MIOT_WSL_VENV=/home/<user>/.venvs/miot-vacuum-rooms` on Windows. A venv in your Linux home is much faster than one on the Windows drive and works for all checkouts. In git worktrees `MIOT_WSL_VENV` is required, because a `.venv-wsl/` only exists in the checkout where it was created.
 
 **CI:** `.github/workflows/tests.yml` runs the tests on every push and pull request against the minimum (2026.3.x) and the current (2026.10.x) Home Assistant version.
+
+## Releasing
+
+Releases are automated with [release-please](https://github.com/googleapis/release-please). It reads the Conventional Commit messages on `main`.
+
+1. Develop as usual and test the change **manually in your local Home Assistant** before merging to `main`.
+2. After each merge, release-please opens or updates a **release PR** with the next version and the changelog. It also updates `version` in `custom_components/miot_vacuum_rooms/manifest.json`.
+3. Merge the release PR. This creates the tag `vX.Y.Z` and the GitHub release, which HACS offers as an update.
+
+`tests/test_release.py` checks that `manifest.json`, `.release-please-manifest.json` and `release-please-config.json` stay consistent.
+
+Notes:
+
+- **First release:** `release-please-config.json` contains `"release-as": "0.1.0"`. Remove that line after the first release is published, otherwise every release PR would propose 0.1.0 again.
+- **Repository setting:** *Settings → Actions → General → "Allow GitHub Actions to create and approve pull requests"* must be enabled, otherwise the workflow cannot open the release PR.
+- **No checks on the release PR:** pull requests created with the default `GITHUB_TOKEN` do not trigger other workflows (tests, validation). To get those checks, store a personal access token as a secret and pass it to the action via `token:`.
