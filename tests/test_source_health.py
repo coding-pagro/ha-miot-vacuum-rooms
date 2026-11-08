@@ -11,14 +11,19 @@ from pytest_homeassistant_custom_component.common import (
 )
 
 from homeassistant.components.vacuum import DOMAIN as VACUUM_DOMAIN
-from homeassistant.config_entries import ConfigEntryState
+from homeassistant.config_entries import ConfigEntryDisabler, ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.util import dt as dt_util
 
 from custom_components.miot_vacuum_rooms import source_health
-from custom_components.miot_vacuum_rooms.const import CONF_ROOMS, CONF_SOURCES, DOMAIN
+from custom_components.miot_vacuum_rooms.const import (
+    CONF_DEVICE_ID,
+    CONF_ROOMS,
+    CONF_SOURCES,
+    DOMAIN,
+)
 from custom_components.miot_vacuum_rooms.discovery import discover_sources
 
 from .conftest import VACUUM, button_id, notify_id, sensor_id
@@ -77,14 +82,26 @@ def _add_vacuum(hass: HomeAssistant, unique_id: str, *, platform: str = "xiaomi_
     ).id
 
 
+def _device_id(hass: HomeAssistant) -> str:
+    """device_id des Xiaomi-Geräts (über die Vacuum-Entität)."""
+    return er.async_get(hass).async_get(VACUUM).device_id
+
+
 async def _setup_entry(
-    hass: HomeAssistant, sources: dict[str, str], *, unique_id: str | None = None
+    hass: HomeAssistant,
+    sources: dict[str, str],
+    *,
+    unique_id: str | None = None,
+    device_id: str | None = None,
 ) -> MockConfigEntry:
+    data = {CONF_SOURCES: sources}
+    if device_id is not None:
+        data[CONF_DEVICE_ID] = device_id
     entry = MockConfigEntry(
         domain=DOMAIN,
         title="Robbi",
         unique_id=unique_id or sources.get("vacuum", "robbi"),
-        data={CONF_SOURCES: sources},
+        data=data,
         options={CONF_ROOMS: ROOMS},
     )
     entry.add_to_hass(hass)
@@ -285,7 +302,7 @@ async def test_nothing_to_heal_no_update(hass: HomeAssistant, build_device) -> N
         "async_update_entry",
         wraps=hass.config_entries.async_update_entry,
     ) as update:
-        entry = await _setup_entry(hass, sources)
+        entry = await _setup_entry(hass, sources, device_id=_device_id(hass))
     assert update.call_count == 0
     assert entry.data[CONF_SOURCES] == sources
 
@@ -355,6 +372,7 @@ async def test_renamed_source_needs_no_heal(hass: HomeAssistant, build_device) -
     """Neue Entitäts-ID, gleiche Registry-ID: keine Heilung, keine Meldung."""
     build_device()
     sources = discover_sources(hass, VACUUM)
+    device_id = _device_id(hass)
     er.async_get(hass).async_update_entity(
         sensor_id("task"), new_entity_id="sensor.renamed_task"
     )
@@ -363,7 +381,7 @@ async def test_renamed_source_needs_no_heal(hass: HomeAssistant, build_device) -
         "async_update_entry",
         wraps=hass.config_entries.async_update_entry,
     ) as update:
-        entry = await _setup_entry(hass, sources)
+        entry = await _setup_entry(hass, sources, device_id=device_id)
     assert update.call_count == 0
     assert entry.runtime_data.entity_id("prop_task") == "sensor.renamed_task"
     assert _issue(hass, "missing_sources", entry) is None
@@ -587,3 +605,105 @@ async def test_runtime_rename_source(hass: HomeAssistant, build_device) -> None:
     assert entry.runtime_data.entity_id("prop_task") == "sensor.renamed_task"
     assert _issue(hass, "missing_sources", entry) is None
     assert _issue(hass, "disabled_sources", entry) is None
+
+
+# --- Gespeichertes Gerät und Entladen ------------------------------------
+
+
+def _recreate_all(hass: HomeAssistant, sources: dict[str, str]) -> None:
+    """Xiaomi Home legt alle Quellen neu an (neue Registry-IDs, gleiches Gerät)."""
+    registry = er.async_get(hass)
+    for registry_id in sources.values():
+        _recreate(hass, registry.async_get(registry_id).entity_id)
+
+
+async def test_device_id_stored_once(hass: HomeAssistant, build_device) -> None:
+    """Einträge ohne gespeichertes Gerät bekommen es beim ersten Laden, danach nie wieder."""
+    build_device()
+    sources = discover_sources(hass, VACUUM)
+    entry = await _setup_entry(hass, sources)
+    assert entry.data[CONF_DEVICE_ID] == _device_id(hass)
+    assert entry.data[CONF_SOURCES] == sources
+
+    with _count_updates(hass) as update:
+        assert await hass.config_entries.async_reload(entry.entry_id)
+        await hass.async_block_till_done()
+    assert update.call_count == 0
+
+
+async def test_all_sources_recreated_healed_via_stored_device(
+    hass: HomeAssistant, build_device
+) -> None:
+    """Keine gespeicherte ID gilt mehr: das gespeicherte Gerät hilft beim Laden."""
+    build_device()
+    sources = discover_sources(hass, VACUUM)
+    device_id = _device_id(hass)
+    _recreate_all(hass, sources)
+
+    entry = await _setup_entry(hass, sources, device_id=device_id)
+
+    healed = entry.data[CONF_SOURCES]
+    assert set(healed) == set(sources)
+    assert not set(healed.values()) & set(sources.values())
+    assert entry.unique_id == healed["vacuum"]
+    assert entry.runtime_data.entity_id("vacuum") == VACUUM
+    assert entry.runtime_data.entity_id("prop_values") == sensor_id("values")
+    assert _issue(hass, "missing_sources", entry) is None
+
+
+async def test_all_sources_recreated_without_stored_device(
+    hass: HomeAssistant, build_device
+) -> None:
+    """Ohne gespeichertes Gerät (alter Eintrag) lässt sich nichts heilen."""
+    build_device()
+    sources = discover_sources(hass, VACUUM)
+    _recreate_all(hass, sources)
+
+    entry = await _setup_entry(hass, sources)
+
+    assert entry.data[CONF_SOURCES] == sources
+    assert CONF_DEVICE_ID not in entry.data
+    assert _issue(hass, "missing_sources", entry) is not None
+
+
+async def test_runtime_all_sources_recreated(hass: HomeAssistant, build_device) -> None:
+    """Xiaomi Home legt zur Laufzeit alle Quellen neu an: geheilt nach dem Cooldown."""
+    build_device()
+    sources = discover_sources(hass, VACUUM)
+    entry = await _setup_entry(hass, sources)
+
+    _recreate_all(hass, sources)
+    await _after_cooldown(hass)
+
+    healed = entry.data[CONF_SOURCES]
+    assert not set(healed.values()) & set(sources.values())
+    assert entry.unique_id == healed["vacuum"]
+    assert entry.state is ConfigEntryState.LOADED
+    assert entry.runtime_data.entity_id("act_start") == notify_id("start")
+    assert _issue(hass, "missing_sources", entry) is None
+
+
+async def test_disabled_entry_has_no_issues(hass: HomeAssistant, build_device) -> None:
+    """Deaktivieren entlädt den Eintrag und entfernt die Meldungen; Aktivieren bringt sie zurück."""
+    build_device()
+    sources = discover_sources(hass, VACUUM)
+    registry = er.async_get(hass)
+    _remove(hass, sensor_id("values"))
+    registry.async_update_entity(
+        button_id("stop_clean"), disabled_by=er.RegistryEntryDisabler.USER
+    )
+    entry = await _setup_entry(hass, sources)
+    assert _issue(hass, "missing_sources", entry) is not None
+    assert _issue(hass, "disabled_sources", entry) is not None
+
+    assert await hass.config_entries.async_set_disabled_by(
+        entry.entry_id, ConfigEntryDisabler.USER
+    )
+    await hass.async_block_till_done()
+    assert _issue(hass, "missing_sources", entry) is None
+    assert _issue(hass, "disabled_sources", entry) is None
+
+    assert await hass.config_entries.async_set_disabled_by(entry.entry_id, None)
+    await hass.async_block_till_done()
+    assert _issue(hass, "missing_sources", entry) is not None
+    assert _issue(hass, "disabled_sources", entry) is not None

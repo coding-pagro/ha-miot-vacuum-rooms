@@ -11,6 +11,9 @@ DOMAIN = "miot_vacuum_rooms"
 
 CONF_VACUUM = "vacuum_entity_id"
 CONF_SOURCES = "sources"  # Rolle -> Registry-ID der Quell-Entität
+# Xiaomi-Gerät der Quellen (device_id), zuletzt bestimmt. Damit lassen sich
+# die Quellen auch dann neu finden, wenn keine gespeicherte ID mehr gilt.
+CONF_DEVICE_ID = "device_id"
 CONF_ROOMS = "rooms"  # Name -> Raum-ID (Optionen)
 CONF_REQUIRE_DOCKED = "require_docked"
 

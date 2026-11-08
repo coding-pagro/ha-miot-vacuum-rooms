@@ -14,11 +14,12 @@ import logging
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, callback
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.debounce import Debouncer
 
-from .const import CONF_SOURCES, DOMAIN, OPTIONAL_ROLES, ROLES, SIID
+from .const import CONF_DEVICE_ID, CONF_SOURCES, DOMAIN, OPTIONAL_ROLES, ROLES, SIID
 from .discovery import find_sources, find_vacuum, role_label
 from .util import parse_entity_suffix
 
@@ -46,7 +47,12 @@ def issue_id(key: str, entry_id: str) -> str:
 
 @callback
 def async_find_device_id(hass: HomeAssistant, entry: ConfigEntry) -> str | None:
-    """Xiaomi-Gerät des Eintrags: über die Vacuum-Quelle, sonst eine andere Quelle."""
+    """Xiaomi-Gerät des Eintrags.
+
+    Über die Vacuum-Quelle, sonst eine andere noch existierende Quelle. Gilt
+    keine Quelle mehr (z. B. Xiaomi Home hat alle neu angelegt), das zuletzt
+    gespeicherte Gerät, solange es noch existiert.
+    """
     registry = er.async_get(hass)
     sources: dict[str, str] = entry.data[CONF_SOURCES]
     ordered = [sources.get("vacuum")] + [
@@ -58,6 +64,9 @@ def async_find_device_id(hass: HomeAssistant, entry: ConfigEntry) -> str | None:
         registry_entry = registry.async_get(registry_id)
         if registry_entry is not None and registry_entry.device_id is not None:
             return registry_entry.device_id
+    stored = entry.data.get(CONF_DEVICE_ID)
+    if stored is not None and dr.async_get(hass).async_get(stored) is not None:
+        return stored
     return None
 
 
@@ -68,6 +77,7 @@ def async_heal_sources(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     Gültige Zuordnungen bleiben unangetastet. Die Vacuum-Quelle wird nur
     ersetzt, wenn am Gerät genau eine fremde Vacuum-Entität hängt; dann folgt
     auch entry.unique_id (die Duplikaterkennung des Config-Flows nutzt sie).
+    Merkt sich außerdem das Gerät in entry.data (CONF_DEVICE_ID).
     Gibt zurück, ob der Eintrag geändert wurde.
     """
     registry = er.async_get(hass)
@@ -77,14 +87,15 @@ def async_heal_sources(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         registry_id = sources.get(role)
         return registry_id is not None and registry.async_get(registry_id) is not None
 
-    if all(valid(role) for role in ALL_ROLES):
-        return False
     device_id = async_find_device_id(hass, entry)
     if device_id is None:
         return False
 
-    changed = False
-    found, _ = find_sources(hass, device_id)
+    changed = entry.data.get(CONF_DEVICE_ID) != device_id
+    if all(valid(role) for role in ALL_ROLES):
+        found: dict[str, str] = {}
+    else:
+        found, _ = find_sources(hass, device_id)
     for role, registry_id in found.items():
         if not valid(role):
             sources[role] = registry_id
@@ -107,14 +118,11 @@ def async_heal_sources(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if not changed:
         return False
 
+    data = {**entry.data, CONF_SOURCES: sources, CONF_DEVICE_ID: device_id}
     if new_vacuum is not None:
-        hass.config_entries.async_update_entry(
-            entry, data={**entry.data, CONF_SOURCES: sources}, unique_id=new_vacuum
-        )
+        hass.config_entries.async_update_entry(entry, data=data, unique_id=new_vacuum)
     else:
-        hass.config_entries.async_update_entry(
-            entry, data={**entry.data, CONF_SOURCES: sources}
-        )
+        hass.config_entries.async_update_entry(entry, data=data)
     return True
 
 

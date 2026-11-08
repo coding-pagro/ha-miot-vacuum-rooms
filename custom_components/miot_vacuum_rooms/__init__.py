@@ -48,7 +48,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: MiotVacuumConfigEntry) -
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: MiotVacuumConfigEntry) -> bool:
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unloaded:
+        # Ein deaktivierter Eintrag soll keine Meldungen zeigen; beim Laden
+        # entstehen sie neu.
+        async_delete_issues(hass, entry.entry_id)
+    return unloaded
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: MiotVacuumConfigEntry) -> None:
