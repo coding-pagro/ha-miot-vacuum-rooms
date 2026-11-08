@@ -27,8 +27,8 @@ jobs:
             install: -r requirements_test.txt
             upload: true
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python }}
           cache: pip
@@ -39,12 +39,12 @@ jobs:
         run: >-
           python -m pytest --cov --cov-report=term-missing --cov-report=xml
           --junitxml=junit.xml -o junit_family=legacy
-      - uses: codecov/codecov-action@v5
+      - uses: codecov/codecov-action@v7
         if: ${{ matrix.upload }}
         with:
           files: coverage.xml
           fail_ci_if_error: false
-      - uses: codecov/codecov-action@v5
+      - uses: codecov/codecov-action@v7
         if: ${{ matrix.upload && !cancelled() }}
         with:
           report_type: test_results
