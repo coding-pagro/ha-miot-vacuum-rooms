@@ -112,7 +112,11 @@ async def test_activity_follows_source(hass: HomeAssistant, build_device) -> Non
     [
         ("docked", "Area Pause", "paused"),  # Mopp waschen / zurückgeschickt
         ("docked", "Full Pause", "paused"),
+        ("docked", "Area Clean", "cleaning"),  # Mopp waschen vor dem Losfahren
+        ("docked", "Area Resume", "cleaning"),
         ("docked", "Idle", "docked"),
+        ("docked", "None", "docked"),
+        ("docked", "unavailable", "docked"),
         ("returning", "Area Pause", "returning"),
         ("cleaning", "Area Resume", "cleaning"),
     ],

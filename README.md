@@ -89,7 +89,7 @@ Every learned room also gets a "Clean …" button that calls the same service fo
 
 ## Vacuum entity
 
-The integration adds its own vacuum entity (`vacuum.<device>`) to its device. It mirrors the state of the Xiaomi vacuum and is unavailable when that one is. One difference: when the robot is on its dock but the job is only paused (job status ends in `Pause`), it shows **Paused** instead of Docked. The Xiaomi entity starts without a room selection, with whatever global mode is set, and even in the middle of a job. This entity does not:
+The integration adds its own vacuum entity (`vacuum.<device>`) to its device. It mirrors the state of the Xiaomi vacuum and is unavailable when that one is. One difference: when the robot is on its dock but a job is open, it does not show Docked. With a paused job (job status ends in `Pause`, e.g. after "return to base" during a run, or while the mop is washed in the middle of a job) it shows **Paused**, with a running job (e.g. washing the mop before it drives off) **Cleaning**. The Xiaomi entity starts without a room selection, with whatever global mode is set, and even in the middle of a job. This entity does not:
 
 | Button / action | What happens |
 |---|---|

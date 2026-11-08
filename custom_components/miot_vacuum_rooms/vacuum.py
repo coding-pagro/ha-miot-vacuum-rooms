@@ -108,10 +108,15 @@ class MiotRoomsVacuum(StateVacuumEntity):
         state = self._controller.state("vacuum")
         self._attr_available = state not in _UNAVAILABLE
         self._attr_activity = _ACTIVITIES.get(state) if state else None
-        # In der Station, aber der Auftrag ist nur pausiert (Mopp waschen,
-        # oder pausiert und zurückgeschickt): als pausiert zeigen.
-        if state in _AT_BASE and self._controller.job_paused:
-            self._attr_activity = VacuumActivity.PAUSED
+        # In der Station, aber ein Auftrag ist offen: pausiert (Mopp waschen
+        # mitten im Auftrag, oder pausiert und zurückgeschickt) zeigt
+        # "pausiert", ein laufender (Mopp waschen vor dem Losfahren) "reinigt".
+        if state in _AT_BASE and self._controller.job_pending:
+            self._attr_activity = (
+                VacuumActivity.PAUSED
+                if self._controller.job_paused
+                else VacuumActivity.CLEANING
+            )
         if state not in _UNAVAILABLE and state not in _ACTIVITIES:
             if state not in self._logged_states:
                 self._logged_states.add(state)
