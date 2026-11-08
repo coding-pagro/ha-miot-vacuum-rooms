@@ -20,8 +20,16 @@
   "options": {
     "step": {
       "init": {
+        "title": "MIoT Vacuum Rooms",
+        "description": "What do you want to do?",
+        "menu_options": {
+          "rooms": "Edit rooms and behaviour",
+          "learn": "Learn a room"
+        }
+      },
+      "rooms": {
         "title": "Rooms and behaviour",
-        "description": "One room per line as Name=ID, for example Kitchen=4. The easiest way to find the IDs is the Learn room service.",
+        "description": "One room per line as Name=ID, for example Kitchen=4. The easiest way to find the IDs is \"Learn a room\" in the menu.",
         "data": {
           "rooms": "Rooms",
           "require_docked": "Only start from the dock"
@@ -29,10 +37,43 @@
         "data_description": {
           "require_docked": "Prevents starting in the middle of a running job, where the robot may lose its orientation."
         }
+      },
+      "learn": {
+        "title": "Learn a room",
+        "description": "Enter a name for the room. After you continue, start exactly this room in the app.",
+        "data": {
+          "name": "Name",
+          "timeout": "Wait time (seconds)"
+        },
+        "data_description": {
+          "name": "Name the room is stored under. A known room ID gets the new name.",
+          "timeout": "How long to wait for the start in the app."
+        }
+      },
+      "learning": {
+        "title": "Learn a room"
+      },
+      "learned": {
+        "title": "Room learned",
+        "description": "Learned {room} = ID {id}. The room button is created."
+      },
+      "learn_failed": {
+        "title": "Learning failed",
+        "description": "Nothing was stored. Continue to try again."
       }
     },
+    "progress": {
+      "learning": "Start exactly this room in the app now ({room}), then cancel the run."
+    },
     "error": {
-      "invalid_rooms": "{error}"
+      "invalid_rooms": "{error}",
+      "empty_name": "The name must not be empty.",
+      "learn_timeout": "No room was started in the app within {seconds} seconds.",
+      "learn_not_single": "More than one room was started ({ids}). Start exactly one room to learn it.",
+      "learn_failed": "Learning failed: {error}"
+    },
+    "abort": {
+      "not_loaded": "The integration is not loaded. Try again once it is running."
     }
   },
   "entity": {

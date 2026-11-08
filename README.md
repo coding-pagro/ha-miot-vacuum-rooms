@@ -46,13 +46,15 @@ Repository: https://github.com/coding-pagro/ha-miot-vacuum-rooms
 
 The robot's room IDs are not the numbers shown on the app map. Example from a Jonr P20 Pro: a room numbered 7 on the map had ID 5 on the robot.
 
-**Option A, service:** Developer tools → Actions → `miot_vacuum_rooms.learn_room`, enter a name, run it. Then start exactly that room in the app, wait a moment and cancel the run in the app. The ID is stored under the name.
+**Option A, dialog:** Settings → Devices & services → MIoT Vacuum Rooms → *Configure* → **Learn a room**. Enter a name (and, if needed, the wait time, default 90 s) and continue. When the dialog asks you to, start exactly that room in the app, wait a moment and cancel the run in the app. The dialog then shows "Learned *name* = ID *n*"; the room button is created. On a timeout or when several rooms were started, the dialog shows the reason and lets you try again; nothing is stored in that case.
+
+**Option B, action:** Developer tools → Actions → `miot_vacuum_rooms.learn_room`, enter a name, run it, then start exactly that room in the app and cancel the run. Same logic as the dialog, usable from automations and scripts.
 
 - Only a *new* change of the sensor counts. The previous run must have finished (sensor empty).
 - Starting several rooms at once is rejected.
 - A new name for a known ID replaces the old name.
 
-**Option B, text:** Integration → *Configure* → Rooms, one room per line as `Name=ID`.
+**Option C, text:** Integration → *Configure* → Edit rooms and behaviour, one room per line as `Name=ID`.
 
 Example:
 

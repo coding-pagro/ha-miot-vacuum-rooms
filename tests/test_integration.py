@@ -132,7 +132,13 @@ async def test_config_flow_rejects_duplicate(hass: HomeAssistant, build_device) 
 async def test_options_flow(hass: HomeAssistant, build_device) -> None:
     entry, _ = await _setup(hass, build_device)
     result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["type"] is FlowResultType.MENU
+    assert result["menu_options"] == ["rooms", "learn"]
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "rooms"}
+    )
     assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "rooms"
 
     bad = await hass.config_entries.options.async_configure(
         result["flow_id"],
@@ -147,6 +153,133 @@ async def test_options_flow(hass: HomeAssistant, build_device) -> None:
     assert done["type"] is FlowResultType.CREATE_ENTRY
     assert entry.options[CONF_ROOMS] == {"Küche": 4, "Bad": 7}
     assert entry.options[CONF_REQUIRE_DOCKED] is False
+
+
+async def _start_learning(hass: HomeAssistant, entry, name: str, timeout: int = 10):
+    """Öffnet das Menü, wählt „Raum anlernen“ und sendet das Formular."""
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "learn"}
+    )
+    assert result["step_id"] == "learn"
+    return await hass.config_entries.options.async_configure(
+        result["flow_id"], {"name": name, "timeout": timeout}
+    )
+
+
+async def _finish_progress(hass: HomeAssistant, result):
+    """Wartet, bis der Fortschrittsschritt abgeschlossen ist, und liefert den Folgeschritt."""
+    for _ in range(100):
+        if result["type"] is not FlowResultType.SHOW_PROGRESS:
+            break
+        await asyncio.sleep(0.02)
+        await hass.async_block_till_done()
+        result = await hass.config_entries.options.async_configure(result["flow_id"])
+    return result
+
+
+async def test_options_learn_room_success(hass: HomeAssistant, build_device) -> None:
+    entry, _ = await _setup(hass, build_device)
+    result = await _start_learning(hass, entry, " Gästezimmer ")
+    assert result["type"] is FlowResultType.SHOW_PROGRESS
+    assert result["progress_action"] == "learning"
+
+    # Der Wert vor dem Start zählt nicht, nur ein neuer Wechsel.
+    hass.states.async_set(sensor_id("values"), "[11]")
+    result = await _finish_progress(hass, result)
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "learned"
+    assert result["description_placeholders"] == {"room": "Gästezimmer", "id": "11"}
+
+    done = await hass.config_entries.options.async_configure(result["flow_id"], {})
+    await hass.async_block_till_done()
+    assert done["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options[CONF_ROOMS]["Gästezimmer"] == 11
+    assert er.async_get(hass).async_get_entity_id(
+        "button", DOMAIN, f"{entry.entry_id}_room_11"
+    )
+
+
+async def test_options_learn_room_replaces_name_of_known_id(
+    hass: HomeAssistant, build_device
+) -> None:
+    entry, _ = await _setup(hass, build_device)
+    result = await _start_learning(hass, entry, "Kochbereich")
+    hass.states.async_set(sensor_id("values"), "[4]")
+    result = await _finish_progress(hass, result)
+    await hass.config_entries.options.async_configure(result["flow_id"], {})
+    await hass.async_block_till_done()
+    assert "Küche" not in entry.options[CONF_ROOMS]
+    assert entry.options[CONF_ROOMS]["Kochbereich"] == 4
+
+
+async def test_options_learn_room_timeout_then_retry(
+    hass: HomeAssistant, build_device, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    entry, _ = await _setup(hass, build_device)
+    before = dict(entry.options[CONF_ROOMS])
+
+    # Erster Versuch: die Wartezeit läuft ab, ohne dass ein Raum gestartet wird.
+    from custom_components.miot_vacuum_rooms import controller as controller_module
+
+    real_wait = controller_module.async_wait_for_state
+    calls = 0
+
+    async def wait_once_without_change(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            await asyncio.sleep(0.05)
+            return None
+        return await real_wait(*args, **kwargs)
+
+    monkeypatch.setattr(
+        controller_module, "async_wait_for_state", wait_once_without_change
+    )
+    result = await _start_learning(hass, entry, "Gästezimmer", timeout=10)
+    result = await _finish_progress(hass, result)
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "learn_failed"
+    assert result["errors"] == {"base": "learn_timeout"}
+    assert result["description_placeholders"]["seconds"] == "10"
+    assert entry.options[CONF_ROOMS] == before
+
+    # Wiederholen: neues Formular, dann gilt wieder nur ein neuer Wechsel.
+    again = await hass.config_entries.options.async_configure(result["flow_id"], {})
+    assert again["step_id"] == "learn"
+    again = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"name": "Gästezimmer", "timeout": 10}
+    )
+    assert again["type"] is FlowResultType.SHOW_PROGRESS
+    hass.states.async_set(sensor_id("values"), "[11]")
+    again = await _finish_progress(hass, again)
+    assert again["step_id"] == "learned"
+
+
+async def test_options_learn_room_rejects_multiple_rooms(
+    hass: HomeAssistant, build_device
+) -> None:
+    entry, _ = await _setup(hass, build_device)
+    before = dict(entry.options[CONF_ROOMS])
+    result = await _start_learning(hass, entry, "X")
+    hass.states.async_set(sensor_id("values"), "[12,6]")
+    result = await _finish_progress(hass, result)
+    assert result["step_id"] == "learn_failed"
+    assert result["errors"] == {"base": "learn_not_single"}
+    assert result["description_placeholders"]["ids"] == "[12,6]"
+    assert entry.options[CONF_ROOMS] == before
+
+
+async def test_options_learn_room_rejects_empty_name(
+    hass: HomeAssistant, build_device
+) -> None:
+    entry, _ = await _setup(hass, build_device)
+    before = dict(entry.options[CONF_ROOMS])
+    result = await _start_learning(hass, entry, "   ")
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "learn"
+    assert result["errors"] == {"name": "empty_name"}
+    assert entry.options[CONF_ROOMS] == before
 
 
 # --- Räume reinigen -------------------------------------------------------
@@ -577,3 +710,60 @@ async def test_unload(hass: HomeAssistant, build_device) -> None:
     assert await hass.config_entries.async_unload(entry.entry_id)
     await hass.async_block_till_done()
     assert entry.state is config_entries.ConfigEntryState.NOT_LOADED
+
+
+# --- Anlernen im Dialog: weitere Pfade --------------------------------------
+
+
+async def test_options_learn_room_aborts_when_entry_not_loaded(
+    hass: HomeAssistant, build_device
+) -> None:
+    entry, _ = await _setup(hass, build_device)
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "learn"}
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "not_loaded"
+
+
+async def test_options_learn_room_close_dialog_cancels_wait(
+    hass: HomeAssistant, build_device
+) -> None:
+    entry, _ = await _setup(hass, build_device)
+    before = dict(entry.options[CONF_ROOMS])
+    result = await _start_learning(hass, entry, "Gästezimmer")
+    assert result["type"] is FlowResultType.SHOW_PROGRESS
+    hass.config_entries.options.async_abort(result["flow_id"])
+    await hass.async_block_till_done()
+    hass.states.async_set(sensor_id("values"), "[11]")
+    await hass.async_block_till_done()
+    assert entry.options[CONF_ROOMS] == before
+
+
+@pytest.mark.parametrize(
+    ("error", "expected"),
+    [
+        (HomeAssistantError("kaputt"), "kaputt"),
+        (RuntimeError("unerwartet"), "unerwartet"),
+        (asyncio.CancelledError(), "cancelled"),
+    ],
+)
+async def test_options_learn_room_other_errors_show_failed_step(
+    hass: HomeAssistant, build_device, monkeypatch: pytest.MonkeyPatch, error, expected
+) -> None:
+    from custom_components.miot_vacuum_rooms.controller import VacuumController
+
+    entry, _ = await _setup(hass, build_device)
+
+    async def fail(self, name, timeout):
+        await asyncio.sleep(0.05)
+        raise error
+
+    monkeypatch.setattr(VacuumController, "async_learn_room", fail)
+    result = await _start_learning(hass, entry, "X")
+    result = await _finish_progress(hass, result)
+    assert result["step_id"] == "learn_failed"
+    assert result["errors"] == {"base": "learn_failed"}
+    assert result["description_placeholders"]["error"] == expected
