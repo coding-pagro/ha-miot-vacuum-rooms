@@ -214,7 +214,7 @@ class VacuumController:
                 return None
             try:
                 codes.append(int(float(value)))
-            except ValueError:
+            except (ValueError, OverflowError):
                 return None
         robot, station = codes
         if robot:

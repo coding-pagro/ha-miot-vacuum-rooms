@@ -124,7 +124,7 @@ So while the cleaning mode is *Customised*, the vacuum entity **hides its fan sp
 
 The robot and its station report error codes as numbers (`0` = no error) in two sensors of the Xiaomi Home integration: `error` (`p_17_35`, robot) and `station_error` (`p_17_79`, station). This integration turns them into text:
 
-- **Problem sensor** (diagnostic, on the integration's device): `No problem` while both codes are `0`, otherwise the translated text for the code. Unknown non-zero codes show as `robot_unknown` / `station_unknown`. The raw codes are always available as the attributes `robot_error_code` and `station_error_code`. The sensor is unavailable when the source sensors are.
+- **Problem sensor** (diagnostic, on the integration's device): `No problem` while both codes are `0`, otherwise the translated text for the code. Unknown non-zero codes show as "Robot error (unknown code)" / "Station error (unknown code)"; the underlying state value, for automations, is `robot_unknown` / `station_unknown`. If both report an error at the same time, the robot error decides the text; the station code stays visible in its attribute. The raw codes are always available as the attributes `robot_error_code` and `station_error_code`. The sensor is unavailable when the source sensors are.
 - **Vacuum entity:** while a code is non-zero it shows **Error** (instead of Paused/Docked) and has the translated problem as the attribute `problem`. When the code returns to `0`, it shows its normal state again.
 - Build notifications or automations on the problem sensor; this integration does not send any, and it cannot clear errors.
 
@@ -136,7 +136,7 @@ Known codes (only codes confirmed on the device are listed):
 
 **Fresh water tank** (`clean_water_cistern_p_17_51`): `Normal`, `Uninstalled`, `Unusable`, `FluidLow`. Other station sensors on the device: dirty water tank `drain_cistern_p_17_52` (`Nor`, `Uninstall`, `Unusable`), mop wash tank `mop_clean_tank_p_17_54` and dust bag `dust_bag_p_17_53` (`Nor`, `Uninstall`).
 
-**Reporting a new code:** an unknown code shows as `robot_unknown` / `station_unknown`. Open an issue with the code (from the attributes), what the robot announced or the app showed at that moment, and what you did to clear it. To add a code yourself, put it into `ROBOT_ERROR_CODES` or `STATION_ERROR_CODES` in `const.py` (code → key, e.g. `4003: "robot_4003"`) and add that key under `entity.sensor.problem.state` and `entity.vacuum.vacuum.state_attributes.problem.state` in `translations/en.json` and `de.json`. Only add codes whose meaning is confirmed.
+**Reporting a new code:** an unknown code shows as "Robot/Station error (unknown code)" (state value `robot_unknown` / `station_unknown`). Open an issue with the code (from the attributes), what the robot announced or the app showed at that moment, and what you did to clear it. To add a code yourself, put it into `ROBOT_ERROR_CODES` or `STATION_ERROR_CODES` in `const.py` (code → key, e.g. `1234: "robot_1234"`, with `1234` as a placeholder) and add that key under `entity.sensor.problem.state` and `entity.vacuum.vacuum.state_attributes.problem.state` in `translations/en.json` and `de.json`. Only add codes whose meaning is confirmed.
 
 ## Select entities
 

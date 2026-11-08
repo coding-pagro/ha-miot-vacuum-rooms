@@ -113,3 +113,37 @@ async def test_existing_entry_gets_error_roles(
     hass.states.async_set(sensor_id("station_error"), "4502")
     sensor, _ = await _states(hass, entry)
     assert sensor.state == "station_4502"
+
+
+async def test_robot_code_unavailable(hass: HomeAssistant, build_device) -> None:
+    entry, _ = await _setup(hass, build_device)
+    hass.states.async_set(sensor_id("error"), "unavailable")
+    sensor, vacuum = await _states(hass, entry)
+    assert sensor.state == "unavailable"
+    assert vacuum.state == VacuumActivity.DOCKED
+
+
+async def test_both_codes_robot_wins(hass: HomeAssistant, build_device) -> None:
+    entry, _ = await _setup(hass, build_device)
+    hass.states.async_set(sensor_id("error"), "4003")
+    hass.states.async_set(sensor_id("station_error"), "4502")
+    sensor, _ = await _states(hass, entry)
+    assert sensor.state == "robot_unknown"
+    assert sensor.attributes["station_error_code"] == 4502
+
+
+async def test_non_numeric_code(hass: HomeAssistant, build_device) -> None:
+    entry, _ = await _setup(hass, build_device)
+    hass.states.async_set(sensor_id("error"), "inf")
+    sensor, _ = await _states(hass, entry)
+    assert sensor.state == "unavailable"
+
+
+async def test_vacuum_source_unavailable_with_error(
+    hass: HomeAssistant, build_device
+) -> None:
+    entry, _ = await _setup(hass, build_device)
+    hass.states.async_set(sensor_id("station_error"), "4502")
+    hass.states.async_set(VACUUM, "unavailable")
+    _, vacuum = await _states(hass, entry)
+    assert vacuum.state == "unavailable"
