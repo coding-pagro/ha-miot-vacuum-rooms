@@ -181,6 +181,21 @@
             "name": "Fehlercode Station"
           }
         }
+      },
+      "current_rooms": {
+        "name": "Räume im aktuellen Lauf",
+        "state": {
+          "idle": "Kein Lauf",
+          "whole_floor": "Ganzes Stockwerk"
+        },
+        "state_attributes": {
+          "room_ids": {
+            "name": "Raum-IDs"
+          },
+          "rooms": {
+            "name": "Räume"
+          }
+        }
       }
     }
   },
