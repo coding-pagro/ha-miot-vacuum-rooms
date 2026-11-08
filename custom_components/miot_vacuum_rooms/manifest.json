@@ -3,7 +3,9 @@
   "name": "MIoT Vacuum Rooms",
   "codeowners": [],
   "config_flow": true,
-  "dependencies": ["notify"],
+  "dependencies": [
+    "notify"
+  ],
   "documentation": "https://github.com/coding-pagro/ha-miot-vacuum-rooms",
   "integration_type": "service",
   "iot_class": "calculated",
