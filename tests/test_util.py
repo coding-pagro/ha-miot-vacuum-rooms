@@ -108,4 +108,4 @@ def test_resolve_room_ids():
     ],
 )
 def test_start_accepted(task, values, rooms, expected) -> None:
-    assert util.start_accepted(task, values, rooms) is expected
+    assert util.start_accepted(task, values, rooms, ("Idle", "None")) is expected

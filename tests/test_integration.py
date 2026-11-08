@@ -390,6 +390,18 @@ async def test_start_without_sensor_sends_once(
     assert len(_starts(calls)) == 1
 
 
+async def test_start_without_status_sensor_sends_once(
+    hass: HomeAssistant, build_device, fast_confirm
+) -> None:
+    _, calls = await _setup(hass, build_device, start_accepts=lambda n: False)
+    hass.states.async_set(sensor_id("mode"), "Custom")
+    hass.states.async_set(sensor_id("task"), "unavailable")
+    await hass.services.async_call(
+        DOMAIN, "clean_rooms", {"rooms": ["Flur"]}, blocking=True
+    )
+    assert len(_starts(calls)) == 1
+
+
 async def test_clean_floor_retries_on_status_only(
     hass: HomeAssistant, build_device, fast_confirm
 ) -> None:

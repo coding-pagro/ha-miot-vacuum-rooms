@@ -43,6 +43,40 @@ _LOGGER = logging.getLogger(__name__)
 _UNAVAILABLE = (None, "unknown", "unavailable")
 
 
+async def async_wait_until(
+    hass: HomeAssistant,
+    entity_ids: list[str],
+    condition: Callable[[], bool],
+    timeout: float,
+    *,
+    check_current: bool = True,
+) -> bool:
+    """Wartet, bis condition wahr ist; geprüft bei jeder Zustandsänderung.
+
+    Mit check_current wird zuerst der aktuelle Zustand geprüft, nachdem der
+    Listener registriert ist, damit keine Änderung zwischen Senden und Warten
+    verloren geht. Gibt False bei Zeitüberschreitung zurück.
+    """
+    future: asyncio.Future[None] = hass.loop.create_future()
+
+    @callback
+    def _changed(event: Event) -> None:
+        if not future.done() and condition():
+            future.set_result(None)
+
+    unsub = async_track_state_change_event(hass, entity_ids, _changed)
+    try:
+        if check_current and condition():
+            return True
+        async with asyncio.timeout(timeout):
+            await future
+        return True
+    except TimeoutError:
+        return False
+    finally:
+        unsub()
+
+
 async def async_wait_for_state(
     hass: HomeAssistant,
     entity_id: str,
@@ -56,30 +90,17 @@ async def async_wait_for_state(
     Gibt den passenden Zustand zurück oder None bei Zeitüberschreitung.
     Mit check_current=False zählen nur neue Zustandswechsel.
     """
-    future: asyncio.Future[str] = hass.loop.create_future()
 
-    @callback
-    def _changed(event: Event) -> None:
-        new_state = event.data.get("new_state")
-        if (
-            new_state is not None
-            and predicate(new_state.state)
-            and not future.done()
-        ):
-            future.set_result(new_state.state)
+    def _matches() -> bool:
+        state = hass.states.get(entity_id)
+        return state is not None and predicate(state.state)
 
-    unsub = async_track_state_change_event(hass, [entity_id], _changed)
-    try:
-        if check_current:
-            current = hass.states.get(entity_id)
-            if current is not None and predicate(current.state):
-                return current.state
-        async with asyncio.timeout(timeout):
-            return await future
-    except TimeoutError:
+    if not await async_wait_until(
+        hass, [entity_id], _matches, timeout, check_current=check_current
+    ):
         return None
-    finally:
-        unsub()
+    state = hass.states.get(entity_id)
+    return state.state if state else None
 
 
 class VacuumController:
@@ -291,8 +312,8 @@ class VacuumController:
 
         for _ in range(START_ATTEMPTS):
             await self.async_send("act_start", message)
-            if await self._async_wait_until(
-                [task_entity, values_entity], accepted, START_CONFIRM_SECONDS
+            if await async_wait_until(
+                self.hass, [task_entity, values_entity], accepted, START_CONFIRM_SECONDS
             ):
                 return
             if self.job_pending:
@@ -314,33 +335,6 @@ class VacuumController:
                 "seconds": str(START_CONFIRM_SECONDS),
             },
         )
-
-    async def _async_wait_until(
-        self, entity_ids: list[str], condition: Callable[[], bool], timeout: float
-    ) -> bool:
-        """Wartet, bis condition wahr ist; prüft bei jeder Zustandsänderung.
-
-        Der aktuelle Zustand wird zuerst geprüft, damit eine Änderung zwischen
-        Senden und Warten nicht verloren geht.
-        """
-        future: asyncio.Future[None] = self.hass.loop.create_future()
-
-        @callback
-        def _changed(event: Event) -> None:
-            if not future.done() and condition():
-                future.set_result(None)
-
-        unsub = async_track_state_change_event(self.hass, entity_ids, _changed)
-        try:
-            if condition():
-                return True
-            async with asyncio.timeout(timeout):
-                await future
-            return True
-        except TimeoutError:
-            return False
-        finally:
-            unsub()
 
     # --- Räume anlernen -------------------------------------------------
 

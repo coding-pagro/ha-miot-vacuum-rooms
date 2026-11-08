@@ -98,7 +98,7 @@ def start_accepted(
     task: str | None,
     values: str | None,
     room_ids: list[int] | None,
-    idle: tuple[str, ...] = ("Idle", "None"),
+    idle: tuple[str, ...],
 ) -> bool:
     """Prüft, ob der Roboter einen Start übernommen hat.
 
