@@ -125,3 +125,40 @@ def start_accepted(
         return True
     current = parse_clean_values(values)
     return current is not None and sorted(current) == sorted(room_ids)
+
+
+_STATE_MAX_LENGTH = 255
+
+
+def describe_current_rooms(
+    state: str | None,
+    rooms: dict[str, int],
+    *,
+    idle: str = "idle",
+    whole_floor: str = "whole_floor",
+) -> tuple[str | None, list[int], list[str]]:
+    """Übersetzt clean-values (p_17_34) in (Zustand, Raum-IDs, Raumnamen).
+
+    '' (zwischen den Läufen) -> idle, '[]' (ganzes Stockwerk) -> whole_floor,
+    sonst die Raumnamen in der Reihenfolge des Rohwerts, mit ', ' verbunden.
+    Nicht angelernte IDs erscheinen als 'ID n', doppelte IDs nur einmal.
+    Haben mehrere Namen dieselbe ID, gilt der erste in der Raumtabelle.
+    Nicht auswertbare Werte liefern (None, [], []).
+    idle/whole_floor: Zustandswerte (const.CURRENT_ROOMS_*).
+    """
+    if state == "":
+        return idle, [], []
+    values = parse_clean_values(state)
+    if values is None:
+        return None, [], []
+    if not values:
+        return whole_floor, [], []
+    names_by_id: dict[int, str] = {}
+    for name, room_id in rooms.items():
+        names_by_id.setdefault(room_id, name)
+    room_ids = list(dict.fromkeys(values))
+    names = [names_by_id.get(room_id, f"ID {room_id}") for room_id in room_ids]
+    text = ", ".join(names)
+    if len(text) > _STATE_MAX_LENGTH:
+        text = text[: _STATE_MAX_LENGTH - 1] + "…"
+    return text, room_ids, names

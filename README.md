@@ -92,6 +92,23 @@ The switch applies to everything that cleans rooms: `clean_rooms`, the room butt
 
 Every learned room also gets a "Clean …" button that calls the same service for that one room.
 
+## Rooms in current run
+
+The sensor **"Rooms in current run"** (on the integration's device) shows which rooms the robot is cleaning in the current run. It translates `p_17_34` (clean values) with the learned rooms:
+
+| `p_17_34` | State | Attributes `room_ids` / `rooms` |
+|---|---|---|
+| `""` (between runs) | `idle` ("No run") | `[]` / `[]` |
+| `[]` (whole floor) | `whole_floor` ("Whole floor") | `[]` / `[]` |
+| `[12,6]` | `Kitchen, Bathroom` | `[12, 6]` / `["Kitchen", "Bathroom"]` |
+| not readable (e.g. `unknown`) | `unknown` | `[]` / `[]` |
+
+- Room names follow the order of `p_17_34`. Duplicate IDs are shown once.
+- A room ID that is not learned shows as `ID 12`.
+- The state is cut to 255 characters (ending in `…`); the attributes always hold the full lists.
+- The sensor is `unavailable` while `p_17_34` is unavailable or missing.
+- It only lists the rooms of the run. It does not know the current room or which rooms are already done. Changes to the room list apply after the entry reloads (saving the options does that).
+
 ## Vacuum entity
 
 The integration adds its own vacuum entity (`vacuum.<device>`) to its device. It mirrors the state of the Xiaomi vacuum and is unavailable when that one is. One difference: when the robot is on its dock but a job is open, it does not show Docked. With a paused job (job status ends in `Pause`, e.g. after "return to base" during a run, or while the mop is washed in the middle of a job) it shows **Paused**, with a running job (e.g. washing the mop before it drives off) **Cleaning**. While the robot or its station reports an error code it shows **Error** (see Problems and error codes). The Xiaomi entity starts without a room selection, with whatever global mode is set, and even in the middle of a job. This entity does not:

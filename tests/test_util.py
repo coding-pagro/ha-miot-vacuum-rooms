@@ -127,3 +127,62 @@ def test_redact_entity_id():
         == "notify.x_12345_xm2216_start_clean_a_17_1"
     )
     assert util.redact_entity_id("vacuum.robbi") == "vacuum.robbi"
+
+
+_ROOMS = {"Küche": 12, "Bad": 6, "Flur": 3}
+
+
+@pytest.mark.parametrize(
+    ("state", "expected"),
+    [
+        ("", ("idle", [], [])),
+        ("[]", ("whole_floor", [], [])),
+        ("[6]", ("Bad", [6], ["Bad"])),
+        # Reihenfolge des Rohwerts, nicht der Raumtabelle
+        ("[12,6]", ("Küche, Bad", [12, 6], ["Küche", "Bad"])),
+        ("[6,12,3]", ("Bad, Küche, Flur", [6, 12, 3], ["Bad", "Küche", "Flur"])),
+        # nicht angelernte ID
+        ("[12,99]", ("Küche, ID 99", [12, 99], ["Küche", "ID 99"])),
+        # doppelte IDs nur einmal, erste Position zählt
+        ("[6,12,6]", ("Bad, Küche", [6, 12], ["Bad", "Küche"])),
+        ("unknown", (None, [], [])),
+        ("unavailable", (None, [], [])),
+        (None, (None, [], [])),
+        ("abc", (None, [], [])),
+        ("[true]", (None, [], [])),
+        ('["a"]', (None, [], [])),
+        ("5", (None, [], [])),
+    ],
+)
+def test_describe_current_rooms(state, expected) -> None:
+    assert util.describe_current_rooms(state, _ROOMS) == expected
+
+
+def test_describe_current_rooms_custom_state_values() -> None:
+    assert util.describe_current_rooms("", {}, idle="i", whole_floor="w")[0] == "i"
+    assert util.describe_current_rooms("[]", {}, idle="i", whole_floor="w")[0] == "w"
+
+
+def test_describe_current_rooms_first_name_wins() -> None:
+    # Im Textformat möglich: zwei Namen für dieselbe ID
+    rooms = {"Küche": 4, "Bad": 4}
+    assert util.describe_current_rooms("[4]", rooms) == ("Küche", [4], ["Küche"])
+
+
+def test_describe_current_rooms_truncates_to_255() -> None:
+    rooms = {f"Raum {i:02d} " + "x" * 20: i for i in range(20)}
+    state, room_ids, names = util.describe_current_rooms(
+        "[" + ",".join(str(i) for i in range(20)) + "]", rooms
+    )
+    assert len(state) == 255
+    assert state.endswith("…")
+    assert state[:-1] == ", ".join(names)[:254]
+    # Attribute bleiben vollständig
+    assert room_ids == list(range(20))
+    assert len(names) == 20
+
+
+def test_describe_current_rooms_exactly_255_not_truncated() -> None:
+    name = "x" * 255
+    state, _, _ = util.describe_current_rooms("[1]", {name: 1})
+    assert state == name

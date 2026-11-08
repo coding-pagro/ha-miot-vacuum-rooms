@@ -181,6 +181,21 @@
             "name": "Station error code"
           }
         }
+      },
+      "current_rooms": {
+        "name": "Rooms in current run",
+        "state": {
+          "idle": "No run",
+          "whole_floor": "Whole floor"
+        },
+        "state_attributes": {
+          "room_ids": {
+            "name": "Room IDs"
+          },
+          "rooms": {
+            "name": "Rooms"
+          }
+        }
       }
     }
   },
