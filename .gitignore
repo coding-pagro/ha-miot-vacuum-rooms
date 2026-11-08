@@ -25,3 +25,5 @@ Thumbs.db
 # Persönliche Notizen (Grundriss, Geräte-ID)
 saugroboter-erkenntnisse.md
 docs/ERKENNTNISSE.md
+coverage.xml
+junit.xml

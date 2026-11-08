@@ -3,3 +3,4 @@
 # Home Assistant version. The minimum version is tested in CI only
 # (see .github/workflows/tests.yml). Requires Python 3.14.
 pytest-homeassistant-custom-component==0.13.375
+pytest-cov

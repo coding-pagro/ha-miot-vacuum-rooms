@@ -1,5 +1,6 @@
 name: Tests
 
+# Runs on every push (all branches): scripts/check.py relies on it in CI mode.
 on:
   push:
   pull_request:
@@ -18,17 +19,34 @@ jobs:
           # Minimum version (hacs.json), first release with CLEAN_AREA
           - ha: "2026.3"
             python: "3.14"
-            install: pytest-homeassistant-custom-component==0.13.320
-          # Current version
+            install: pytest-homeassistant-custom-component==0.13.320 pytest-cov
+            upload: false
+          # Current version (requirements_test.txt, kept up to date by Dependabot)
           - ha: "2026.10"
             python: "3.14"
             install: -r requirements_test.txt
+            upload: true
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: requirements_test.txt
       - name: Install
         run: python -m pip install ${{ matrix.install }}
       - name: Test
-        run: python -m pytest
+        run: >-
+          python -m pytest --cov --cov-report=term-missing --cov-report=xml
+          --junitxml=junit.xml -o junit_family=legacy
+      - uses: codecov/codecov-action@v5
+        if: ${{ matrix.upload }}
+        with:
+          files: coverage.xml
+          fail_ci_if_error: false
+      - uses: codecov/codecov-action@v5
+        if: ${{ matrix.upload && !cancelled() }}
+        with:
+          report_type: test_results
+          files: junit.xml
+          fail_ci_if_error: false
