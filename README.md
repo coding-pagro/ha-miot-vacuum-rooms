@@ -167,6 +167,17 @@ All values were confirmed on the device by switching them in the app and reading
 
 With several vacuums, pass `entry_id` each time.
 
+## Repairs and diagnostics
+
+The integration stores its source entities (the Xiaomi vacuum and the action, sensor and button entities) by their entity registry ID, so renaming them does no harm. When Xiaomi Home creates an entity anew (for example after an update or after setting it up again), the entity gets a new registry ID. On startup, the integration searches the Xiaomi device again for every source whose registry ID is gone (by the numbers at the end of the entity ID, as during setup) and takes over what it finds. Working sources are never replaced. The Xiaomi vacuum itself is only replaced if exactly one other vacuum entity of the Xiaomi integration is on the device.
+
+What cannot be fixed this way shows up under **Settings → System → Repairs**:
+
+- **Source entities missing** (error): required sources that could not be found on the device, for example `sensor p_17_34`. Check in Xiaomi Home that the device and these entities still exist. If they do not come back, remove the vacuum from this integration and set it up again. A missing optional source (the stop-clean button) does not raise this message.
+- **Source entities disabled** (warning): sources that are disabled in Home Assistant, listed by entity ID. Enable them under Settings → Entities. The integration does not enable them by itself.
+
+Both messages disappear on their own once the cause is gone. They have no repair dialog.
+
 ## Limitations
 
 - **No map.** The map data lives in the Xiaomi cloud. Through the official integration, the robot only reports a map ID locally. The cloud map integrations in HACS do not list `xtl` robots in their device lists (not verified).

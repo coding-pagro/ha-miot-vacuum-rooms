@@ -303,5 +303,15 @@
     "fan_speed_customised": {
       "message": "Der Reinigungsmodus ist „Personalisieren“: Der Roboter nutzt die Raumeinstellungen aus der App, die globale Saugleistung ist ohne Wirkung. Zuerst einen anderen Reinigungsmodus wählen oder das Auswahlfeld „Saugleistung“ verwenden."
     }
+  },
+  "issues": {
+    "missing_sources": {
+      "title": "Quell-Entitäten fehlen für {title}",
+      "description": "Diese Quell-Entitäten der Xiaomi-Home-Integration wurden für „{title}“ nicht gefunden, auch nicht bei erneuter Suche am Gerät: {entities}.\n\nPrüfe in Xiaomi Home, ob das Gerät und diese Entitäten noch vorhanden sind. Kommen sie nicht zurück, entferne „{title}“ und richte es neu ein. Die Meldung verschwindet von selbst, sobald alle Quellen gefunden sind."
+    },
+    "disabled_sources": {
+      "title": "Quell-Entitäten deaktiviert für {title}",
+      "description": "Diese Quell-Entitäten der Xiaomi-Home-Integration sind deaktiviert, „{title}“ kann sie deshalb nicht nutzen: {entities}.\n\nAktiviere sie bei den Entitäten des Geräts (Einstellungen > Geräte & Dienste > Entitäten). Die Meldung verschwindet von selbst, sobald alle aktiv sind."
+    }
   }
 }

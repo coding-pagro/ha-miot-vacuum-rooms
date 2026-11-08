@@ -8,14 +8,16 @@ sowie Tasten pro Raum.
 from __future__ import annotations
 
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import entity_registry as er
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.typing import ConfigType
 
 from .controller import MiotVacuumConfigEntry, VacuumController
-from .const import CONF_SOURCES, DOMAIN, OPTIONAL_ROLES, ROLES
-from .discovery import MissingSourcesError, NoDeviceError, discover_sources
 from .services import async_register_services
+from .source_health import (
+    async_delete_issues,
+    async_heal_sources,
+    async_update_issues,
+)
 
 PLATFORMS = [
     Platform.SWITCH,
@@ -33,7 +35,10 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: MiotVacuumConfigEntry) -> bool:
-    _async_add_new_sources(hass, entry)
+    # Tote oder neue Quellen am Gerät suchen (z. B. nach einem Update von
+    # Xiaomi Home oder für Rollen, die nach der Einrichtung dazukamen).
+    async_heal_sources(hass, entry)
+    async_update_issues(hass, entry)
     entry.runtime_data = VacuumController(hass, entry)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
@@ -44,26 +49,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: MiotVacuumConfigEntry) 
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
 
-@callback
-def _async_add_new_sources(hass: HomeAssistant, entry: MiotVacuumConfigEntry) -> None:
-    """Ergänzt Rollen, die nach der Einrichtung dazugekommen sind (z. B. prop_task, act_stop_clean).
-
-    Gelingt die Suche nicht, bleibt alles wie es ist; die Steuerung kommt
-    ohne die neue Rolle aus (Verhalten wie vorher).
-    """
-    sources: dict[str, str] = entry.data[CONF_SOURCES]
-    if all(role in sources for role in (*ROLES, *OPTIONAL_ROLES)):
-        return
-    vacuum = er.async_get(hass).async_get(sources["vacuum"])
-    if vacuum is None:
-        return
-    try:
-        found = discover_sources(hass, vacuum.entity_id)
-    except (NoDeviceError, MissingSourcesError):
-        return
-    hass.config_entries.async_update_entry(
-        entry, data={**entry.data, CONF_SOURCES: {**found, **sources}}
-    )
+async def async_remove_entry(hass: HomeAssistant, entry: MiotVacuumConfigEntry) -> None:
+    """Entfernt die Reparaturmeldungen des Eintrags."""
+    async_delete_issues(hass, entry.entry_id)
 
 
 async def _async_options_updated(
