@@ -710,3 +710,60 @@ async def test_unload(hass: HomeAssistant, build_device) -> None:
     assert await hass.config_entries.async_unload(entry.entry_id)
     await hass.async_block_till_done()
     assert entry.state is config_entries.ConfigEntryState.NOT_LOADED
+
+
+# --- Anlernen im Dialog: weitere Pfade --------------------------------------
+
+
+async def test_options_learn_room_aborts_when_entry_not_loaded(
+    hass: HomeAssistant, build_device
+) -> None:
+    entry, _ = await _setup(hass, build_device)
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "learn"}
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "not_loaded"
+
+
+async def test_options_learn_room_close_dialog_cancels_wait(
+    hass: HomeAssistant, build_device
+) -> None:
+    entry, _ = await _setup(hass, build_device)
+    before = dict(entry.options[CONF_ROOMS])
+    result = await _start_learning(hass, entry, "Gästezimmer")
+    assert result["type"] is FlowResultType.SHOW_PROGRESS
+    hass.config_entries.options.async_abort(result["flow_id"])
+    await hass.async_block_till_done()
+    hass.states.async_set(sensor_id("values"), "[11]")
+    await hass.async_block_till_done()
+    assert entry.options[CONF_ROOMS] == before
+
+
+@pytest.mark.parametrize(
+    ("error", "expected"),
+    [
+        (HomeAssistantError("kaputt"), "kaputt"),
+        (RuntimeError("unerwartet"), "unerwartet"),
+        (asyncio.CancelledError(), "cancelled"),
+    ],
+)
+async def test_options_learn_room_other_errors_show_failed_step(
+    hass: HomeAssistant, build_device, monkeypatch: pytest.MonkeyPatch, error, expected
+) -> None:
+    from custom_components.miot_vacuum_rooms.controller import VacuumController
+
+    entry, _ = await _setup(hass, build_device)
+
+    async def fail(self, name, timeout):
+        await asyncio.sleep(0.05)
+        raise error
+
+    monkeypatch.setattr(VacuumController, "async_learn_room", fail)
+    result = await _start_learning(hass, entry, "X")
+    result = await _finish_progress(hass, result)
+    assert result["step_id"] == "learn_failed"
+    assert result["errors"] == {"base": "learn_failed"}
+    assert result["description_placeholders"]["error"] == expected
