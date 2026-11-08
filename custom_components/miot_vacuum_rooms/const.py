@@ -31,6 +31,9 @@ ROLES: dict[str, tuple[str, int]] = {
     "act_route": ("a", 50),
     "prop_values": ("p", 34),
     "prop_task": ("p", 9),
+    "prop_error": ("p", 35),  # Fehlercode des Roboters, 0 = kein Fehler
+    "prop_station_error": ("p", 79),  # Fehlercode der Station, 0 = kein Fehler
+    "prop_water_tank": ("p", 51),  # Frischwassertank: Normal, Uninstalled, ...
     "prop_mode": ("p", 10),
     "prop_fan": ("p", 13),
     "prop_count": ("p", 14),
@@ -101,6 +104,24 @@ MODE_CUSTOM = "custom"
 # steht dann auf "... Pause". Nur "Idle" (oder "None") heißt: kein Auftrag offen.
 TASK_IDLE = ("Idle", "None")
 TASK_PAUSE_SUFFIX = " Pause"
+
+# Bekannte Fehlercodes -> Übersetzungsschlüssel des Problems. Neue Codes
+# werden nur hier ergänzt (plus Übersetzungen, siehe README). Nur Codes
+# eintragen, deren Bedeutung am Gerät bestätigt ist.
+PROBLEM_NONE = "none"
+PROBLEM_ROBOT_UNKNOWN = "robot_unknown"
+PROBLEM_STATION_UNKNOWN = "station_unknown"
+ROBOT_ERROR_CODES: dict[int, str] = {}
+STATION_ERROR_CODES: dict[int, str] = {
+    4502: "station_4502",  # zu wenig Wasser oder kein Schmutzwassertank
+}
+PROBLEM_OPTIONS = [
+    PROBLEM_NONE,
+    PROBLEM_ROBOT_UNKNOWN,
+    PROBLEM_STATION_UNKNOWN,
+    *ROBOT_ERROR_CODES.values(),
+    *STATION_ERROR_CODES.values(),
+]
 
 SERVICE_CLEAN_ROOMS = "clean_rooms"
 SERVICE_CLEAN_FLOOR = "clean_floor"

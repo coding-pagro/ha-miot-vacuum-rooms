@@ -89,7 +89,7 @@ Every learned room also gets a "Clean …" button that calls the same service fo
 
 ## Vacuum entity
 
-The integration adds its own vacuum entity (`vacuum.<device>`) to its device. It mirrors the state of the Xiaomi vacuum and is unavailable when that one is. One difference: when the robot is on its dock but a job is open, it does not show Docked. With a paused job (job status ends in `Pause`, e.g. after "return to base" during a run, or while the mop is washed in the middle of a job) it shows **Paused**, with a running job (e.g. washing the mop before it drives off) **Cleaning**. The Xiaomi entity starts without a room selection, with whatever global mode is set, and even in the middle of a job. This entity does not:
+The integration adds its own vacuum entity (`vacuum.<device>`) to its device. It mirrors the state of the Xiaomi vacuum and is unavailable when that one is. One difference: when the robot is on its dock but a job is open, it does not show Docked. With a paused job (job status ends in `Pause`, e.g. after "return to base" during a run, or while the mop is washed in the middle of a job) it shows **Paused**, with a running job (e.g. washing the mop before it drives off) **Cleaning**. While the robot or its station reports an error code it shows **Error** (see Problems and error codes). The Xiaomi entity starts without a room selection, with whatever global mode is set, and even in the middle of a job. This entity does not:
 
 | Button / action | What happens |
 |---|---|
@@ -119,6 +119,24 @@ So while the cleaning mode is *Customised*, the vacuum entity **hides its fan sp
 **Cleaning mode:** the vacuum dialog has no field for it, so the entity reports it as the attribute `cleaning_mode` (shown translated under *Attributes* in the dialog). To see and change it at a glance, put the "Cleaning mode" select next to the vacuum on your dashboard.
 
 **Tip:** the Xiaomi vacuum entity is no longer needed on dashboards. You can hide it: Settings → Entities → select the Xiaomi vacuum → settings → *Visible* off. Do not disable or delete it, this integration reads its state and sends commands through it.
+
+## Problems and error codes
+
+The robot and its station report error codes as numbers (`0` = no error) in two sensors of the Xiaomi Home integration: `error` (`p_17_35`, robot) and `station_error` (`p_17_79`, station). This integration turns them into text:
+
+- **Problem sensor** (diagnostic, on the integration's device): `No problem` while both codes are `0`, otherwise the translated text for the code. Unknown non-zero codes show as "Robot error (unknown code)" / "Station error (unknown code)"; the underlying state value, for automations, is `robot_unknown` / `station_unknown`. If both report an error at the same time, the robot error decides the text; the station code stays visible in its attribute. The raw codes are always available as the attributes `robot_error_code` and `station_error_code`. The sensor is unavailable when the source sensors are.
+- **Vacuum entity:** while a code is non-zero it shows **Error** (instead of Paused/Docked) and has the translated problem as the attribute `problem`. When the code returns to `0`, it shows its normal state again.
+- Build notifications or automations on the problem sensor; this integration does not send any, and it cannot clear errors.
+
+Known codes (only codes confirmed on the device are listed):
+
+| Source | Code | Meaning |
+|---|---|---|
+| Station | 4502 | Not enough water or no dirty water tank installed (the fresh water tank sensor then reads `Uninstalled`) |
+
+**Fresh water tank** (`clean_water_cistern_p_17_51`): `Normal`, `Uninstalled`, `Unusable`, `FluidLow`. Other station sensors on the device: dirty water tank `drain_cistern_p_17_52` (`Nor`, `Uninstall`, `Unusable`), mop wash tank `mop_clean_tank_p_17_54` and dust bag `dust_bag_p_17_53` (`Nor`, `Uninstall`).
+
+**Reporting a new code:** an unknown code shows as "Robot/Station error (unknown code)" (state value `robot_unknown` / `station_unknown`). Open an issue with the code (from the attributes), what the robot announced or the app showed at that moment, and what you did to clear it. To add a code yourself, put it into `ROBOT_ERROR_CODES` or `STATION_ERROR_CODES` in `const.py` (code → key, e.g. `1234: "robot_1234"`, with `1234` as a placeholder) and add that key under `entity.sensor.problem.state` and `entity.vacuum.vacuum.state_attributes.problem.state` in `translations/en.json` and `de.json`. Only add codes whose meaning is confirmed.
 
 ## Select entities
 
