@@ -235,6 +235,9 @@
     "entry_required": {
       "message": "Several vacuums are set up. Please provide entry_id."
     },
+    "start_not_confirmed": {
+      "message": "The robot did not accept the start after {attempts} attempts of {seconds} s each. The cloud confirmed the command, but the robot did not run it (for example during mop washing or battery cycle). Try again later."
+    },
     "job_pending": {
       "message": "A cleaning job is still running or paused (status: {status}), even if the vacuum is on its dock. Start aborted. Wait until the job has finished, or end it in the app."
     },

@@ -28,9 +28,24 @@ from .conftest import VACUUM, notify_id, sensor_id
 ROOMS = {"Küche": 4, "Wohnzimmer": 3, "Flur": 5, "Büro": 12}
 
 
-async def _setup(hass: HomeAssistant, build_device, *, rooms=ROOMS, **options):
+def robot_idle(hass: HomeAssistant) -> None:
+    """Der Auftrag ist beendet (der Mock-Roboter setzt Status und Räume beim Start)."""
+    hass.states.async_set(sensor_id("task"), "Idle")
+    hass.states.async_set(sensor_id("values"), "")
+
+
+async def _setup(
+    hass: HomeAssistant,
+    build_device,
+    *,
+    rooms=ROOMS,
+    start_accepts=lambda attempt: True,
+    **options,
+):
     """Richtet die Integration ein und ersetzt notify.send_message durch einen Mock,
-    der den Roboter nachahmt (Modus-Sensor folgt dem Befehl)."""
+    der den Roboter nachahmt (Modus-Sensor folgt dem Befehl). Einen Start
+    übernimmt der Roboter, wenn start_accepts(Nummer des Versuchs ab 1) wahr ist:
+    Auftragsstatus und clean-values folgen dann dem Befehl."""
     build_device()
     sources = discover_sources(hass, VACUUM)
     entry = MockConfigEntry(
@@ -47,8 +62,19 @@ async def _setup(hass: HomeAssistant, build_device, *, rooms=ROOMS, **options):
     calls: list[ServiceCall] = []
     mode_values = {"[0]": "BothWork", "[1]": "OnlySweep", "[4]": "Custom"}
 
+    starts = 0
+
     async def _send_message(call: ServiceCall) -> None:
+        nonlocal starts
         calls.append(call)
+        if call.data["entity_id"] == notify_id("start"):
+            starts += 1
+            if start_accepts(starts):
+                clean_type, values = json.loads(call.data["message"])
+                hass.states.async_set(
+                    sensor_id("task"), "Full Clean" if clean_type == 1 else "Area Clean"
+                )
+                hass.states.async_set(sensor_id("values"), values)
         if call.data["entity_id"] == notify_id("mode"):
             hass.states.async_set(
                 sensor_id("mode"), mode_values[call.data["message"]]
@@ -261,6 +287,136 @@ async def test_clean_floor(hass: HomeAssistant, build_device) -> None:
     assert [(c.data["entity_id"], c.data["message"]) for c in calls] == [
         (notify_id("start"), '[1, "[]"]'),
     ]
+
+
+# --- Start-Verifikation -----------------------------------------------------
+
+
+@pytest.fixture
+def fast_confirm(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verkürzt das Warten auf die Übernahme auf wenige hundert Millisekunden."""
+    monkeypatch.setattr(
+        "custom_components.miot_vacuum_rooms.controller.START_CONFIRM_SECONDS", 0.2
+    )
+
+
+def _starts(calls) -> list[str]:
+    return [c.data["message"] for c in calls if c.data["entity_id"] == notify_id("start")]
+
+
+async def test_start_accepted_first_attempt(
+    hass: HomeAssistant, build_device, fast_confirm
+) -> None:
+    _, calls = await _setup(hass, build_device)
+    hass.states.async_set(sensor_id("mode"), "Custom")
+    await hass.services.async_call(
+        DOMAIN, "clean_rooms", {"rooms": ["Flur"]}, blocking=True
+    )
+    assert _starts(calls) == ['[3, "[5]"]']
+
+
+async def test_start_accepted_second_attempt(
+    hass: HomeAssistant, build_device, fast_confirm
+) -> None:
+    _, calls = await _setup(hass, build_device, start_accepts=lambda n: n == 2)
+    hass.states.async_set(sensor_id("mode"), "Custom")
+    await hass.services.async_call(
+        DOMAIN, "clean_rooms", {"rooms": ["Flur"]}, blocking=True
+    )
+    assert _starts(calls) == ['[3, "[5]"]'] * 2
+
+
+async def test_start_not_confirmed_after_three_attempts(
+    hass: HomeAssistant, build_device, fast_confirm
+) -> None:
+    _, calls = await _setup(hass, build_device, start_accepts=lambda n: False)
+    hass.states.async_set(sensor_id("mode"), "Custom")
+    with pytest.raises(HomeAssistantError) as err:
+        await hass.services.async_call(
+            DOMAIN, "clean_rooms", {"rooms": ["Flur"]}, blocking=True
+        )
+    assert err.value.translation_key == "start_not_confirmed"
+    assert err.value.translation_placeholders == {"attempts": "3", "seconds": "0.2"}
+    assert len(_starts(calls)) == 3
+
+
+async def test_start_status_taken_but_rooms_differ_no_resend(
+    hass: HomeAssistant, build_device, fast_confirm
+) -> None:
+    """Status nicht mehr Idle, Räume stimmen nicht: nicht erneut senden."""
+
+    def _wrong_rooms(attempt: int) -> bool:
+        hass.states.async_set(sensor_id("task"), "Area Clean")
+        hass.states.async_set(sensor_id("values"), "[4]")
+        return False
+
+    _, calls = await _setup(hass, build_device, start_accepts=_wrong_rooms)
+    hass.states.async_set(sensor_id("mode"), "Custom")
+    await hass.services.async_call(
+        DOMAIN, "clean_rooms", {"rooms": ["Flur"]}, blocking=True
+    )
+    assert len(_starts(calls)) == 1
+
+
+async def test_start_with_open_job_sends_once(
+    hass: HomeAssistant, build_device, fast_confirm
+) -> None:
+    """Ohne Docked-Prüfung und mit offenem Auftrag wird nicht verifiziert."""
+    _, calls = await _setup(
+        hass,
+        build_device,
+        start_accepts=lambda n: False,
+        **{CONF_REQUIRE_DOCKED: False},
+    )
+    hass.states.async_set(sensor_id("mode"), "Custom")
+    hass.states.async_set(sensor_id("task"), "Area Clean")
+    await hass.services.async_call(
+        DOMAIN, "clean_rooms", {"rooms": ["Flur"]}, blocking=True
+    )
+    assert len(_starts(calls)) == 1
+
+
+async def test_start_without_sensor_sends_once(
+    hass: HomeAssistant, build_device, fast_confirm
+) -> None:
+    _, calls = await _setup(
+        hass, build_device, start_accepts=lambda n: False
+    )
+    hass.states.async_set(sensor_id("mode"), "Custom")
+    hass.states.async_set(sensor_id("values"), "unavailable")
+    await hass.services.async_call(
+        DOMAIN, "clean_rooms", {"rooms": ["Flur"]}, blocking=True
+    )
+    assert len(_starts(calls)) == 1
+
+
+async def test_start_without_status_sensor_sends_once(
+    hass: HomeAssistant, build_device, fast_confirm
+) -> None:
+    _, calls = await _setup(hass, build_device, start_accepts=lambda n: False)
+    hass.states.async_set(sensor_id("mode"), "Custom")
+    hass.states.async_set(sensor_id("task"), "unavailable")
+    await hass.services.async_call(
+        DOMAIN, "clean_rooms", {"rooms": ["Flur"]}, blocking=True
+    )
+    assert len(_starts(calls)) == 1
+
+
+async def test_clean_floor_retries_on_status_only(
+    hass: HomeAssistant, build_device, fast_confirm
+) -> None:
+    _, calls = await _setup(hass, build_device, start_accepts=lambda n: n == 2)
+    await hass.services.async_call(DOMAIN, "clean_floor", {}, blocking=True)
+    assert _starts(calls) == ['[1, "[]"]'] * 2
+
+
+async def test_clean_floor_not_confirmed(
+    hass: HomeAssistant, build_device, fast_confirm
+) -> None:
+    _, calls = await _setup(hass, build_device, start_accepts=lambda n: False)
+    with pytest.raises(HomeAssistantError):
+        await hass.services.async_call(DOMAIN, "clean_floor", {}, blocking=True)
+    assert len(_starts(calls)) == 3
 
 
 # --- Anlernen -------------------------------------------------------------

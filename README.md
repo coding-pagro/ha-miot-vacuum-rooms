@@ -21,6 +21,7 @@ The integration's UI is available in English and German.
 | Room start with global settings (switch "Use room settings from the app" off) | **Untested** on the device |
 | Integration code | Tested in a Home Assistant test environment, **not yet installed in a live instance** |
 | Whole-floor service | **Untested**, command derived from app behaviour |
+| Start verification with retry | Tested in the test environment only, **not tested on the device** (retry interval, deep-sleep behaviour) |
 | Other models | Unverified. They only work if they use the same MIoT specification (service 17) with the same numbers and values |
 
 ## Requirements
@@ -75,6 +76,7 @@ data:
 
 - The order of the names is the cleaning order.
 - By default it only starts when the robot is on its dock (`docked`) **and no job is open** (job status `p_17_9` is `Idle`). Starting in the middle of a job made the robot lose its orientation. The robot also reports `docked` in the middle of a job, when it returns to wash the mop (job status `Area Pause`), and a robot with a paused job ignores new room starts. The condition can be switched off in the options.
+- The start is verified: the cloud also confirms commands the robot never runs (e.g. during mop washing or the battery cycle). After sending, the integration waits up to 25 s until the job status (`p_17_9`) is no longer `Idle` and, for rooms, `p_17_34` lists the requested room IDs. Otherwise it sends again, up to 3 attempts, and then raises an error. Without the two sensors it sends once as before. Not yet tested on the device.
 
 The switch **"Use room settings from the app"** (on the integration's device, default on, survives restarts) decides which settings apply:
 

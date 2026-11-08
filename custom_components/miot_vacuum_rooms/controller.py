@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import Callable
 
 from homeassistant.config_entries import ConfigEntry
@@ -26,6 +27,8 @@ from .const import (
     PROBLEM_STATION_UNKNOWN,
     ROBOT_ERROR_CODES,
     SELECTS,
+    START_ATTEMPTS,
+    START_CONFIRM_SECONDS,
     STATION_ERROR_CODES,
     TASK_IDLE,
     TASK_PAUSE_SUFFIX,
@@ -36,11 +39,47 @@ from .util import (
     build_value_message,
     parse_clean_values,
     resolve_room_ids,
+    start_accepted,
 )
 
 type MiotVacuumConfigEntry = ConfigEntry[VacuumController]
 
+_LOGGER = logging.getLogger(__name__)
 _UNAVAILABLE = (None, "unknown", "unavailable")
+
+
+async def async_wait_until(
+    hass: HomeAssistant,
+    entity_ids: list[str],
+    condition: Callable[[], bool],
+    timeout: float,
+    *,
+    check_current: bool = True,
+) -> bool:
+    """Wartet, bis condition wahr ist; geprüft bei jeder Zustandsänderung.
+
+    Mit check_current wird zuerst der aktuelle Zustand geprüft, nachdem der
+    Listener registriert ist, damit keine Änderung zwischen Senden und Warten
+    verloren geht. Gibt False bei Zeitüberschreitung zurück.
+    """
+    future: asyncio.Future[None] = hass.loop.create_future()
+
+    @callback
+    def _changed(event: Event) -> None:
+        if not future.done() and condition():
+            future.set_result(None)
+
+    unsub = async_track_state_change_event(hass, entity_ids, _changed)
+    try:
+        if check_current and condition():
+            return True
+        async with asyncio.timeout(timeout):
+            await future
+        return True
+    except TimeoutError:
+        return False
+    finally:
+        unsub()
 
 
 async def async_wait_for_state(
@@ -56,30 +95,17 @@ async def async_wait_for_state(
     Gibt den passenden Zustand zurück oder None bei Zeitüberschreitung.
     Mit check_current=False zählen nur neue Zustandswechsel.
     """
-    future: asyncio.Future[str] = hass.loop.create_future()
 
-    @callback
-    def _changed(event: Event) -> None:
-        new_state = event.data.get("new_state")
-        if (
-            new_state is not None
-            and predicate(new_state.state)
-            and not future.done()
-        ):
-            future.set_result(new_state.state)
+    def _matches() -> bool:
+        state = hass.states.get(entity_id)
+        return state is not None and predicate(state.state)
 
-    unsub = async_track_state_change_event(hass, [entity_id], _changed)
-    try:
-        if check_current:
-            current = hass.states.get(entity_id)
-            if current is not None and predicate(current.state):
-                return current.state
-        async with asyncio.timeout(timeout):
-            return await future
-    except TimeoutError:
+    if not await async_wait_until(
+        hass, [entity_id], _matches, timeout, check_current=check_current
+    ):
         return None
-    finally:
-        unsub()
+    state = hass.states.get(entity_id)
+    return state.state if state else None
 
 
 class VacuumController:
@@ -270,9 +296,7 @@ class VacuumController:
             await self._async_ensure_custom_mode()
         else:
             self._check_global_mode()
-        await self.async_send(
-            "act_start", build_start_message(CLEAN_TYPE_AREA, room_ids)
-        )
+        await self._async_start_verified(CLEAN_TYPE_AREA, room_ids)
 
     async def async_clean_floor(self) -> None:
         """Startet eine Reinigung des ganzen Stockwerks.
@@ -281,7 +305,66 @@ class VacuumController:
         den die App beim Start meldet (Full Clean, clean-values = []).
         """
         self._check_ready()
-        await self.async_send("act_start", build_start_message(CLEAN_TYPE_FULL))
+        await self._async_start_verified(CLEAN_TYPE_FULL, None)
+
+    async def _async_start_verified(
+        self, clean_type: int, room_ids: list[int] | None
+    ) -> None:
+        """Sendet den Start und prüft, ob der Roboter ihn übernimmt.
+
+        Die Cloud bestätigt auch Befehle, die der Roboter verwirft. Bleibt die
+        Übernahme (Status nicht Idle, bei Räumen passende clean-values) aus,
+        wird nach START_CONFIRM_SECONDS erneut gesendet, höchstens
+        START_ATTEMPTS-mal. Fehlt ein Sensor, wird einmal gesendet.
+        """
+        message = build_start_message(clean_type, room_ids)
+        task_entity = self.entity_id("prop_task")
+        values_entity = self.entity_id("prop_values")
+        if (
+            task_entity is None
+            or values_entity is None
+            or self.state("prop_task") in _UNAVAILABLE
+            or self.state("prop_values") in _UNAVAILABLE
+            # Offener Auftrag (nur ohne Docked-Prüfung möglich): "Status nicht
+            # Idle" sagt dann nichts über diesen Start aus.
+            or self.job_pending
+        ):
+            await self.async_send("act_start", message)
+            return
+
+        def accepted() -> bool:
+            return start_accepted(
+                self.state("prop_task"),
+                self.state("prop_values"),
+                room_ids,
+                TASK_IDLE,
+            )
+
+        for _ in range(START_ATTEMPTS):
+            await self.async_send("act_start", message)
+            if await async_wait_until(
+                self.hass, [task_entity, values_entity], accepted, START_CONFIRM_SECONDS
+            ):
+                return
+            if self.job_pending:
+                # Der Roboter hat einen Auftrag übernommen, nur die Räume
+                # stimmen (noch) nicht. Nicht erneut senden, sonst Doppelstart.
+                _LOGGER.warning(
+                    "Roboter hat den Start übernommen (Status %s), clean-values "
+                    "zeigt aber %s statt %s. Kein erneutes Senden.",
+                    self.state("prop_task"),
+                    self.state("prop_values"),
+                    room_ids,
+                )
+                return
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="start_not_confirmed",
+            translation_placeholders={
+                "attempts": str(START_ATTEMPTS),
+                "seconds": str(START_CONFIRM_SECONDS),
+            },
+        )
 
     # --- Räume anlernen -------------------------------------------------
 

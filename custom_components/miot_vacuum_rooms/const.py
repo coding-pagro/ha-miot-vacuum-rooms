@@ -105,6 +105,13 @@ MODE_CUSTOM = "custom"
 TASK_IDLE = ("Idle", "None")
 TASK_PAUSE_SUFFIX = " Pause"
 
+# Start-Verifikation: Die Cloud bestätigt Befehle, die der Roboter nicht
+# ausführt (z. B. bei Stationswäsche oder Akku-Zyklus). Nach dem Senden wird
+# bis zu START_CONFIRM_SECONDS auf die Übernahme gewartet, dann erneut gesendet.
+# Werte sind am Gerät noch nicht gemessen.
+START_CONFIRM_SECONDS = 25
+START_ATTEMPTS = 3
+
 # Bekannte Fehlercodes -> Übersetzungsschlüssel des Problems. Neue Codes
 # werden nur hier ergänzt (plus Übersetzungen, siehe README). Nur Codes
 # eintragen, deren Bedeutung am Gerät bestätigt ist.

@@ -85,3 +85,27 @@ def test_resolve_room_ids():
     assert util.resolve_room_ids(rooms, ["Küche", "Küche"]) == [4]
     with pytest.raises(KeyError):
         util.resolve_room_ids(rooms, ["Bad"])
+
+
+@pytest.mark.parametrize(
+    ("task", "values", "rooms", "expected"),
+    [
+        ("Area Clean", "[5]", [5], True),
+        ("Area Clean", "[12,4]", [4, 12], True),
+        ("Idle", "[5]", [5], False),
+        ("None", "[5]", [5], False),
+        (None, "[5]", [5], False),
+        ("unknown", "[5]", [5], False),
+        ("unavailable", "[5]", [5], False),
+        ("Area Clean", "[4]", [5], False),
+        ("Area Clean", "[5]", [5, 4], False),
+        ("Area Clean", "[5,4]", [5], False),
+        ("Area Clean", "", [5], False),
+        ("Area Clean", None, [5], False),
+        ("Full Clean", None, None, True),
+        ("Full Clean", "[]", None, True),
+        ("Idle", "[]", None, False),
+    ],
+)
+def test_start_accepted(task, values, rooms, expected) -> None:
+    assert util.start_accepted(task, values, rooms, ("Idle", "None")) is expected
