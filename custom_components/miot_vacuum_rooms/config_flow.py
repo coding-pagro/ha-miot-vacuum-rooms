@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import Any
 
 import voluptuous as vol
@@ -31,6 +32,8 @@ from .const import (
 )
 from .discovery import MissingSourcesError, NoDeviceError, discover_sources
 from .util import format_rooms_text, parse_rooms_text
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class MiotVacuumRoomsConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -188,7 +191,11 @@ class MiotVacuumRoomsOptionsFlow(OptionsFlow):
         )
         return self.async_show_form(
             step_id="learn",
-            data_schema=self.add_suggested_values_to_schema(schema, user_input),
+            data_schema=self.add_suggested_values_to_schema(
+                schema,
+                user_input
+                or {ATTR_NAME: self._learn_name, ATTR_TIMEOUT: self._learn_timeout},
+            ),
             errors=errors,
         )
 
@@ -213,15 +220,15 @@ class MiotVacuumRoomsOptionsFlow(OptionsFlow):
         self._learn_task = None
         if task.cancelled():
             self._learn_error = "learn_failed"
-            self._learn_placeholders = {"error": ""}
+            self._learn_placeholders = {"error": "cancelled"}
             return self.async_show_progress_done(next_step_id="learn_failed")
         err = task.exception()
         if err is None:
             self._learn_room_id = task.result()
             return self.async_show_progress_done(next_step_id="learned")
+        key = getattr(err, "translation_key", None)
         if not isinstance(err, HomeAssistantError):
-            raise err
-        key = err.translation_key
+            _LOGGER.exception("Anlernen fehlgeschlagen", exc_info=err)
         if key in ("learn_timeout", "learn_not_single"):
             self._learn_error = key
             self._learn_placeholders = dict(err.translation_placeholders or {})
