@@ -280,10 +280,13 @@
       "message": "The robot did not accept the start after {attempts} attempts of {seconds} s each. The cloud confirmed the command, but the robot did not run it (for example during mop washing or battery cycle). Try again later."
     },
     "job_pending": {
-      "message": "A cleaning job is still running or paused (status: {status}), even if the vacuum is on its dock. Start aborted. Wait until the job has finished, or end it in the app."
+      "message": "A cleaning job is still running or paused (status: {status}), even if the vacuum is on its dock. Start aborted. Wait until the job has finished, or end it with Stop."
+    },
+    "stop_clean_unavailable": {
+      "message": "The job can only be ended with the \"stop-clean\" button of the Xiaomi Home integration ({entity_id}). It is missing or disabled. Enable the button in the device's entities, or end the job in the app."
     },
     "paused_at_base": {
-      "message": "The current job is paused while the vacuum is on its dock (status: {status}). Resume or end it in the app."
+      "message": "The current job is paused while the vacuum is on its dock (status: {status}). End it with Stop, or resume it in the app."
     },
     "no_rooms": {
       "message": "No rooms have been learned yet. Learn rooms first; the vacuum never starts without a room selection."

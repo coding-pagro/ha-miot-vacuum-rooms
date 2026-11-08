@@ -20,6 +20,9 @@ NOTIFY = {
     "mode": "set_clean_mode_a_17_46",
     "route": "fine_drag_switch_a_17_50",
 }
+BUTTON = {
+    "stop_clean": "stop_clean_a_17_3",
+}
 SENSOR = {
     "values": "clean_values_p_17_34",
     "task": "clean_type_status_p_17_9",
@@ -39,6 +42,10 @@ def notify_id(key: str) -> str:
 
 def sensor_id(key: str) -> str:
     return f"sensor.{PREFIX}_{SENSOR[key]}"
+
+
+def button_id(key: str) -> str:
+    return f"button.{PREFIX}_{BUTTON[key]}"
 
 
 @pytest.fixture(autouse=True)
@@ -83,6 +90,8 @@ def build_device(hass: HomeAssistant):
             add("notify", f"{PREFIX}_{name}")
         for name in SENSOR.values():
             add("sensor", f"{PREFIX}_{name}")
+        for name in BUTTON.values():
+            add("button", f"{PREFIX}_{name}")
 
         hass.states.async_set(VACUUM, "docked", {"friendly_name": "Robbi"})
         hass.states.async_set(sensor_id("mode"), "OnlySweep")
@@ -94,6 +103,9 @@ def build_device(hass: HomeAssistant):
         hass.states.async_set(sensor_id("error"), "0")
         hass.states.async_set(sensor_id("station_error"), "0")
         hass.states.async_set(sensor_id("water_tank"), "Normal")
+        if not any(part in BUTTON["stop_clean"] for part in skip):
+            # Tasten von Xiaomi Home haben bis zum ersten Drücken "unknown"
+            hass.states.async_set(button_id("stop_clean"), "unknown")
         return VACUUM
 
     return _build

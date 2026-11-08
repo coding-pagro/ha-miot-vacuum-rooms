@@ -23,7 +23,7 @@ from custom_components.miot_vacuum_rooms.const import (
 )
 from custom_components.miot_vacuum_rooms.discovery import discover_sources
 
-from .conftest import VACUUM, notify_id, sensor_id
+from .conftest import VACUUM, button_id, notify_id, sensor_id
 
 ROOMS = {"Küche": 4, "Wohnzimmer": 3, "Flur": 5, "Büro": 12}
 
@@ -100,6 +100,22 @@ async def test_config_flow_creates_entry(hass: HomeAssistant, build_device) -> N
     assert result["title"] == "Robbi"
     assert "act_start" in result["data"][CONF_SOURCES]
     assert "prop_values" in result["data"][CONF_SOURCES]
+    assert "act_stop_clean" in result["data"][CONF_SOURCES]
+
+
+async def test_config_flow_without_optional_stop_clean(
+    hass: HomeAssistant, build_device
+) -> None:
+    """Die Taste stop-clean ist optional, ohne sie klappt die Einrichtung."""
+    build_device(skip=("stop_clean_a_17_3",))
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_VACUUM: VACUUM}
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert "act_stop_clean" not in result["data"][CONF_SOURCES]
 
 
 async def test_config_flow_reports_missing_entities(
@@ -391,6 +407,26 @@ async def test_existing_entry_gets_new_source(hass: HomeAssistant, build_device)
     await hass.async_block_till_done()
     assert entry.data[CONF_SOURCES] == sources
     assert entry.runtime_data.entity_id("prop_task") == sensor_id("task")
+
+
+async def test_existing_entry_gets_optional_stop_clean(
+    hass: HomeAssistant, build_device
+) -> None:
+    """Einträge von vor der Rolle act_stop_clean bekommen die Taste beim Start."""
+    build_device()
+    sources = discover_sources(hass, VACUUM)
+    old = {role: rid for role, rid in sources.items() if role != "act_stop_clean"}
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Robbi",
+        unique_id=sources["vacuum"],
+        data={CONF_SOURCES: old},
+        options={CONF_ROOMS: ROOMS},
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert entry.runtime_data.entity_id("act_stop_clean") == button_id("stop_clean")
 
 
 async def test_clean_rooms_unknown_room(hass: HomeAssistant, build_device) -> None:

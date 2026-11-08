@@ -13,7 +13,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.typing import ConfigType
 
 from .controller import MiotVacuumConfigEntry, VacuumController
-from .const import CONF_SOURCES, DOMAIN, ROLES
+from .const import CONF_SOURCES, DOMAIN, OPTIONAL_ROLES, ROLES
 from .discovery import MissingSourcesError, NoDeviceError, discover_sources
 from .services import async_register_services
 
@@ -46,13 +46,13 @@ async def async_unload_entry(hass: HomeAssistant, entry: MiotVacuumConfigEntry) 
 
 @callback
 def _async_add_new_sources(hass: HomeAssistant, entry: MiotVacuumConfigEntry) -> None:
-    """Ergänzt Rollen, die nach der Einrichtung dazugekommen sind (z. B. prop_task, prop_error).
+    """Ergänzt Rollen, die nach der Einrichtung dazugekommen sind (z. B. prop_task, act_stop_clean).
 
     Gelingt die Suche nicht, bleibt alles wie es ist; die Steuerung kommt
     ohne die neue Rolle aus (Verhalten wie vorher).
     """
     sources: dict[str, str] = entry.data[CONF_SOURCES]
-    if all(role in sources for role in ROLES):
+    if all(role in sources for role in (*ROLES, *OPTIONAL_ROLES)):
         return
     vacuum = er.async_get(hass).async_get(sources["vacuum"])
     if vacuum is None:

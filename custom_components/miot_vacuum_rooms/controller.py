@@ -186,6 +186,28 @@ class VacuumController:
             blocking=True,
         )
 
+    async def async_stop_job(self) -> None:
+        """Beendet den offenen Auftrag mit stop-clean (a_17_3).
+
+        Der Stopp des Xiaomi-Saugroboters (stop-sweeping, 2.2) wirkt in der
+        Station nicht: ein pausierter Auftrag bleibt offen. stop-clean beendet
+        ihn (am Gerät bestätigt für "Area Pause"). Die Taste dafür legt Xiaomi
+        Home an; ist sie deaktiviert, hat sie keinen Zustand.
+        """
+        entity_id = self.entity_id("act_stop_clean")
+        state = self.hass.states.get(entity_id) if entity_id else None
+        if state is None or state.state == "unavailable":
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="stop_clean_unavailable",
+                translation_placeholders={
+                    "entity_id": entity_id or "button.…_stop_clean_a_17_3"
+                },
+            )
+        await self.hass.services.async_call(
+            "button", "press", {"entity_id": entity_id}, blocking=True
+        )
+
     async def async_set_option(self, key: str, option: str) -> None:
         """Setzt Modus, Saugleistung, Nässe, Durchgänge oder Routenpräferenz."""
         spec = SELECTS[key]

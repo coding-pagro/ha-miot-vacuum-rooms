@@ -280,10 +280,13 @@
       "message": "Der Roboter hat den Start nach {attempts} Versuchen mit je {seconds} s nicht übernommen. Die Cloud hat den Befehl bestätigt, der Roboter führt ihn aber nicht aus (z. B. bei der Mopp-Wäsche oder im Akku-Zyklus). Später erneut versuchen."
     },
     "job_pending": {
-      "message": "Ein Reinigungsauftrag läuft noch oder ist pausiert (Status: {status}), auch wenn der Saugroboter in der Station steht. Start abgebrochen. Warten, bis der Auftrag fertig ist, oder ihn in der App beenden."
+      "message": "Ein Reinigungsauftrag läuft noch oder ist pausiert (Status: {status}), auch wenn der Saugroboter in der Station steht. Start abgebrochen. Warten, bis der Auftrag fertig ist, oder ihn mit Stopp beenden."
+    },
+    "stop_clean_unavailable": {
+      "message": "Der Auftrag lässt sich nur mit der Taste „stop-clean“ der Xiaomi-Home-Integration beenden ({entity_id}). Sie fehlt oder ist deaktiviert. Die Taste in den Entitäten des Geräts aktivieren oder den Auftrag in der App beenden."
     },
     "paused_at_base": {
-      "message": "Der aktuelle Auftrag ist pausiert, während der Saugroboter in der Station steht (Status: {status}). In der App fortsetzen oder beenden."
+      "message": "Der aktuelle Auftrag ist pausiert, während der Saugroboter in der Station steht (Status: {status}). Mit Stopp beenden oder in der App fortsetzen."
     },
     "no_rooms": {
       "message": "Es sind noch keine Räume angelernt. Zuerst Räume anlernen; ohne Raumauswahl startet der Saugroboter nie."

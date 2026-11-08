@@ -5,7 +5,10 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-from pytest_homeassistant_custom_component.common import async_capture_events
+from pytest_homeassistant_custom_component.common import (
+    async_capture_events,
+    async_mock_service,
+)
 
 from homeassistant.components.vacuum import DOMAIN as VACUUM_DOMAIN, VacuumEntityFeature
 from homeassistant.const import EVENT_CALL_SERVICE
@@ -18,7 +21,7 @@ from homeassistant.helpers import issue_registry as ir
 
 from custom_components.miot_vacuum_rooms.const import CONF_REQUIRE_DOCKED, DOMAIN
 
-from .conftest import VACUUM, notify_id, sensor_id
+from .conftest import VACUUM, button_id, notify_id, sensor_id
 from .test_integration import ROOMS, _setup
 
 FEATURES = (
@@ -232,6 +235,87 @@ async def test_pause_stop_return_reach_source(
         await _call(hass, service, entity_id)
     assert _source_calls(events) == ["pause", "stop", "return_to_base"]
     assert calls == []
+
+
+@pytest.mark.parametrize(
+    ("source", "task"),
+    [
+        ("docked", "Area Pause"),  # am Gerät bestätigt
+        ("docked", "Full Pause"),
+        ("idle", "Area Pause"),
+        ("docked", "Area Clean"),  # Mopp waschen vor dem Losfahren, ungetestet
+    ],
+)
+async def test_stop_at_base_ends_open_job(
+    hass: HomeAssistant, build_device, source: str, task: str
+) -> None:
+    """Der Xiaomi-Stopp wirkt in der Station nicht; stop-clean beendet den Auftrag."""
+    entry, calls = await _setup(hass, build_device)
+    presses = async_mock_service(hass, "button", "press")
+    hass.states.async_set(VACUUM, source)
+    hass.states.async_set(sensor_id("task"), task)
+    events = async_capture_events(hass, EVENT_CALL_SERVICE)
+    await _call(hass, "stop", _vacuum(hass, entry))
+    assert [c.data["entity_id"] for c in presses] == [button_id("stop_clean")]
+    assert _source_calls(events) == []
+    assert calls == []
+
+
+@pytest.mark.parametrize(
+    ("source", "task"),
+    [
+        ("docked", "Idle"),  # nichts offen: wie bisher durchreichen
+        ("paused", "Area Pause"),  # pausiert unterwegs
+        ("returning", "Area Pause"),
+    ],
+)
+async def test_stop_away_or_without_job_reaches_source(
+    hass: HomeAssistant, build_device, source: str, task: str
+) -> None:
+    entry, _ = await _setup(hass, build_device)
+    presses = async_mock_service(hass, "button", "press")
+    hass.states.async_set(VACUUM, source)
+    hass.states.async_set(sensor_id("task"), task)
+    events = async_capture_events(hass, EVENT_CALL_SERVICE)
+    await _call(hass, "stop", _vacuum(hass, entry))
+    assert _source_calls(events) == ["stop"]
+    assert presses == []
+
+
+async def test_stop_at_base_without_stop_clean_button(
+    hass: HomeAssistant, build_device
+) -> None:
+    """Gerät ohne Taste: Einrichtung klappt, Stopp erklärt den Ausweg."""
+    entry, _ = await _setup(
+        hass, lambda: build_device(skip=("stop_clean_a_17_3",))
+    )
+    assert entry.runtime_data.entity_id("act_stop_clean") is None
+    presses = async_mock_service(hass, "button", "press")
+    hass.states.async_set(sensor_id("task"), "Area Pause")
+    events = async_capture_events(hass, EVENT_CALL_SERVICE)
+    with pytest.raises(ServiceValidationError) as err:
+        await _call(hass, "stop", _vacuum(hass, entry))
+    assert err.value.translation_key == "stop_clean_unavailable"
+    assert presses == []
+    assert _source_calls(events) == []
+
+
+async def test_stop_at_base_with_disabled_stop_clean_button(
+    hass: HomeAssistant, build_device
+) -> None:
+    """Xiaomi Home legt die Taste an, sie kann aber deaktiviert sein (kein Zustand)."""
+    entry, _ = await _setup(hass, build_device)
+    # Deaktivierte Entitäten stehen in der Registry, haben aber keinen Zustand.
+    hass.states.async_remove(button_id("stop_clean"))
+    presses = async_mock_service(hass, "button", "press")
+    hass.states.async_set(sensor_id("task"), "Area Pause")
+    with pytest.raises(ServiceValidationError) as err:
+        await _call(hass, "stop", _vacuum(hass, entry))
+    assert err.value.translation_key == "stop_clean_unavailable"
+    assert err.value.translation_placeholders == {
+        "entity_id": button_id("stop_clean")
+    }
+    assert presses == []
 
 
 # --- Saugleistung ---------------------------------------------------------

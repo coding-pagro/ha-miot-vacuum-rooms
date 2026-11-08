@@ -10,7 +10,7 @@ from __future__ import annotations
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
-from .const import ROLES, SIID
+from .const import OPTIONAL_ROLES, ROLES, SIID
 from .util import parse_entity_suffix
 
 _DOMAIN_FOR_KIND = {"a": "notify", "p": "sensor"}
@@ -29,13 +29,17 @@ class MissingSourcesError(Exception):
 
 
 def discover_sources(hass: HomeAssistant, vacuum_entity_id: str) -> dict[str, str]:
-    """Liefert Rolle -> Registry-ID, inklusive der Rolle "vacuum"."""
+    """Liefert Rolle -> Registry-ID, inklusive der Rolle "vacuum".
+
+    Optionale Rollen sind nur enthalten, wenn das Gerät sie hat. Deaktivierte
+    Entitäten zählen mit (sie können später aktiviert werden).
+    """
     registry = er.async_get(hass)
     vacuum = registry.async_get(vacuum_entity_id)
     if vacuum is None or vacuum.device_id is None:
         raise NoDeviceError(vacuum_entity_id)
 
-    found: dict[tuple[str, int], str] = {}
+    found: dict[tuple[str, str, int], str] = {}
     for entry in er.async_entries_for_device(
         registry, vacuum.device_id, include_disabled_entities=True
     ):
@@ -43,18 +47,22 @@ def discover_sources(hass: HomeAssistant, vacuum_entity_id: str) -> dict[str, st
         if parsed is None:
             continue
         kind, siid, number = parsed
-        if siid != SIID or entry.domain != _DOMAIN_FOR_KIND[kind]:
+        if siid != SIID:
             continue
-        found.setdefault((kind, number), entry.id)
+        found.setdefault((entry.domain, kind, number), entry.id)
 
     sources = {"vacuum": vacuum.id}
     missing: list[str] = []
     for role, (kind, number) in ROLES.items():
-        registry_id = found.get((kind, number))
+        domain = _DOMAIN_FOR_KIND[kind]
+        registry_id = found.get((domain, kind, number))
         if registry_id is None:
-            missing.append(f"{_DOMAIN_FOR_KIND[kind]} {kind}_{SIID}_{number}")
+            missing.append(f"{domain} {kind}_{SIID}_{number}")
         else:
             sources[role] = registry_id
     if missing:
         raise MissingSourcesError(missing)
+    for role, key in OPTIONAL_ROLES.items():
+        if (registry_id := found.get(key)) is not None:
+            sources[role] = registry_id
     return sources
