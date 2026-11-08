@@ -6,6 +6,8 @@ import json
 import re
 
 _ENTITY_SUFFIX = re.compile(r"_(?P<kind>[ap])_(?P<siid>\d+)_(?P<num>\d+)$")
+_LONG_NUMBER = re.compile(r"\d{6,}")
+REDACTED = "**REDACTED**"
 
 
 def parse_entity_suffix(entity_id: str) -> tuple[str, int, int] | None:
@@ -14,6 +16,15 @@ def parse_entity_suffix(entity_id: str) -> tuple[str, int, int] | None:
     if not match:
         return None
     return match["kind"], int(match["siid"]), int(match["num"])
+
+
+def redact_entity_id(entity_id: str) -> str:
+    """Schwärzt lange Ziffernfolgen (die Xiaomi-Geräte-ID) in einer Entitäts-ID.
+
+    'sensor.xtl_de_1234567890_xm2216_clean_values_p_17_34'
+    -> 'sensor.xtl_de_**REDACTED**_xm2216_clean_values_p_17_34'
+    """
+    return _LONG_NUMBER.sub(REDACTED, entity_id)
 
 
 def build_start_message(clean_type: int, room_ids: list[int] | None = None) -> str:

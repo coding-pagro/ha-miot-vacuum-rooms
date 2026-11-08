@@ -318,5 +318,15 @@
     "fan_speed_customised": {
       "message": "The cleaning mode is Customised: the robot uses the per-room settings from the app, so the global fan speed has no effect. Choose another cleaning mode first, or use the \"Suction power\" select."
     }
+  },
+  "issues": {
+    "missing_sources": {
+      "title": "Source entities missing for {title}",
+      "description": "These source entities of the Xiaomi Home integration could not be found for \"{title}\", not even by searching the device again: {entities}.\n\nCheck in Xiaomi Home that the device and these entities still exist. If they do not come back, remove \"{title}\" and set it up again. This message disappears on its own once all sources are found."
+    },
+    "disabled_sources": {
+      "title": "Source entities disabled for {title}",
+      "description": "These source entities of the Xiaomi Home integration are disabled, so \"{title}\" cannot use them: {entities}.\n\nEnable them in the device's entities (Settings > Devices & services > Entities). This message disappears on its own once all of them are enabled."
+    }
   }
 }

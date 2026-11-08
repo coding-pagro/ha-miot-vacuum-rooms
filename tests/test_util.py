@@ -111,6 +111,24 @@ def test_start_accepted(task, values, rooms, expected) -> None:
     assert util.start_accepted(task, values, rooms, ("Idle", "None")) is expected
 
 
+def test_redact_entity_id():
+    assert (
+        util.redact_entity_id("sensor.xtl_de_1234567890_xm2216_clean_values_p_17_34")
+        == "sensor.xtl_de_**REDACTED**_xm2216_clean_values_p_17_34"
+    )
+    # Jede Folge ab 6 Ziffern, auch mehrere und am Ende
+    assert (
+        util.redact_entity_id("vacuum.a_123456_b_9876543")
+        == "vacuum.a_**REDACTED**_b_**REDACTED**"
+    )
+    # Kürzere Ziffernfolgen (Modell, MIoT-Nummern) bleiben
+    assert (
+        util.redact_entity_id("notify.x_12345_xm2216_start_clean_a_17_1")
+        == "notify.x_12345_xm2216_start_clean_a_17_1"
+    )
+    assert util.redact_entity_id("vacuum.robbi") == "vacuum.robbi"
+
+
 _ROOMS = {"Küche": 12, "Bad": 6, "Flur": 3}
 
 
