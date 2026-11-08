@@ -178,6 +178,8 @@ What cannot be fixed this way shows up under **Settings → System → Repairs**
 
 Both messages appear and disappear without a restart: the integration checks again a few seconds after a source entity, an entity with a matching number or an entity on the Xiaomi device is added, removed, renamed, enabled or disabled. If that check finds a replacement, the integration reloads itself. The messages have no repair dialog.
 
+**Diagnostics:** when you report a problem, attach the diagnostics file: Settings → Devices & services → MIoT Vacuum Rooms → ⋮ next to the vacuum → *Download diagnostics*. It contains the entry title, the rooms and options, every source (entity ID, state, disabled, missing), the integration's own state (room settings switch, open or paused job, problem), the Xiaomi device's manufacturer, model and firmware, and which repair messages are active. In every entity ID, digit runs of six or more (the Xiaomi device ID) are replaced by `**REDACTED**`, for example `sensor.xtl_de_**REDACTED**_xm2216_clean_values_p_17_34`. Registry IDs, device IDs and device identifiers are not included. Room IDs, the title and the firmware version are not redacted.
+
 ## Limitations
 
 - **No map.** The map data lives in the Xiaomi cloud. Through the official integration, the robot only reports a map ID locally. The cloud map integrations in HACS do not list `xtl` robots in their device lists (not verified).
