@@ -20,8 +20,16 @@
   "options": {
     "step": {
       "init": {
+        "title": "MIoT Saugroboter Räume",
+        "description": "Was möchtest du tun?",
+        "menu_options": {
+          "rooms": "Räume und Verhalten bearbeiten",
+          "learn": "Raum anlernen"
+        }
+      },
+      "rooms": {
         "title": "Räume und Verhalten",
-        "description": "Ein Raum pro Zeile im Format Name=ID, zum Beispiel Küche=4. Die IDs lernst du am einfachsten mit dem Dienst „Raum anlernen“.",
+        "description": "Ein Raum pro Zeile im Format Name=ID, zum Beispiel Küche=4. Die IDs lernst du am einfachsten mit „Raum anlernen“ im Menü.",
         "data": {
           "rooms": "Räume",
           "require_docked": "Nur aus der Station starten"
@@ -29,10 +37,43 @@
         "data_description": {
           "require_docked": "Verhindert einen Start mitten in einem laufenden Auftrag, bei dem der Roboter die Orientierung verlieren kann."
         }
+      },
+      "learn": {
+        "title": "Raum anlernen",
+        "description": "Gib dem Raum einen Namen. Nach „Weiter“ startest du genau diesen Raum in der App.",
+        "data": {
+          "name": "Name",
+          "timeout": "Wartezeit (Sekunden)"
+        },
+        "data_description": {
+          "name": "Name, unter dem der Raum gespeichert wird. Eine bekannte Raum-ID bekommt den neuen Namen.",
+          "timeout": "Wie lange auf den Start in der App gewartet wird."
+        }
+      },
+      "learning": {
+        "title": "Raum anlernen"
+      },
+      "learned": {
+        "title": "Raum angelernt",
+        "description": "{room} = ID {id} angelernt. Die Raum-Taste wird angelegt."
+      },
+      "learn_failed": {
+        "title": "Anlernen fehlgeschlagen",
+        "description": "Es wurde nichts gespeichert. Mit „Weiter“ versuchst du es erneut."
       }
     },
+    "progress": {
+      "learning": "Starte jetzt genau diesen Raum in der App ({room}) und brich den Lauf anschließend ab."
+    },
     "error": {
-      "invalid_rooms": "{error}"
+      "invalid_rooms": "{error}",
+      "empty_name": "Der Name darf nicht leer sein.",
+      "learn_timeout": "Innerhalb von {seconds} Sekunden wurde in der App kein Raum gestartet.",
+      "learn_not_single": "Es wurde mehr als ein Raum gestartet ({ids}). Starte genau einen Raum, um ihn anzulernen.",
+      "learn_failed": "Anlernen fehlgeschlagen: {error}"
+    },
+    "abort": {
+      "not_loaded": "Die Integration ist nicht geladen. Versuche es erneut, sobald sie läuft."
     }
   },
   "entity": {

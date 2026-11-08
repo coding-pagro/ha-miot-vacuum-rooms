@@ -484,6 +484,9 @@ async def test_issue_when_ids_change_in_options(
     await hass.async_block_till_done()
 
     result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "rooms"}
+    )
     await hass.config_entries.options.async_configure(
         result["flow_id"],
         {"rooms": "Küche=4\nWohnzimmer=3\nFlur=5\nBüro=12\nBad=7", CONF_REQUIRE_DOCKED: True},
