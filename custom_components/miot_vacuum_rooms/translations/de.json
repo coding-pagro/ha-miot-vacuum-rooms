@@ -111,6 +111,33 @@
               "sweep_then_mop": "Saugen und wischen",
               "custom": "Personalisieren"
             }
+          },
+          "problem": {
+            "name": "Problem",
+            "state": {
+              "robot_unknown": "Roboterfehler (unbekannter Code)",
+              "station_unknown": "Stationsfehler (unbekannter Code)",
+              "station_4502": "Nicht genügend Wasser oder kein Schmutzwassertank installiert"
+            }
+          }
+        }
+      }
+    },
+    "sensor": {
+      "problem": {
+        "name": "Problem",
+        "state": {
+          "none": "Kein Problem",
+          "robot_unknown": "Roboterfehler (unbekannter Code)",
+          "station_unknown": "Stationsfehler (unbekannter Code)",
+          "station_4502": "Nicht genügend Wasser oder kein Schmutzwassertank installiert"
+        },
+        "state_attributes": {
+          "robot_error_code": {
+            "name": "Fehlercode Roboter"
+          },
+          "station_error_code": {
+            "name": "Fehlercode Station"
           }
         }
       }

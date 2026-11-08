@@ -21,7 +21,12 @@ from .const import (
     DEFAULT_REQUIRE_DOCKED,
     DOMAIN,
     MODE_CUSTOM,
+    PROBLEM_NONE,
+    PROBLEM_ROBOT_UNKNOWN,
+    PROBLEM_STATION_UNKNOWN,
+    ROBOT_ERROR_CODES,
     SELECTS,
+    STATION_ERROR_CODES,
     TASK_IDLE,
     TASK_PAUSE_SUFFIX,
     WAIT_MODE_SECONDS,
@@ -194,6 +199,31 @@ class VacuumController:
     def job_paused(self) -> bool:
         task = self.state("prop_task")
         return task is not None and task.endswith(TASK_PAUSE_SUFFIX)
+
+    @property
+    def problem(self) -> tuple[str, int, int] | None:
+        """Aktuelles Problem als (Schlüssel, Roboter-Code, Stations-Code).
+
+        None, wenn eine Quelle fehlt oder nicht verfügbar ist. Schlüssel
+        "none" heißt: beide Codes sind 0.
+        """
+        codes: list[int] = []
+        for role in ("prop_error", "prop_station_error"):
+            value = self.state(role)
+            if value in _UNAVAILABLE:
+                return None
+            try:
+                codes.append(int(float(value)))
+            except ValueError:
+                return None
+        robot, station = codes
+        if robot:
+            key = ROBOT_ERROR_CODES.get(robot, PROBLEM_ROBOT_UNKNOWN)
+        elif station:
+            key = STATION_ERROR_CODES.get(station, PROBLEM_STATION_UNKNOWN)
+        else:
+            key = PROBLEM_NONE
+        return key, robot, station
 
     async def _async_ensure_custom_mode(self) -> None:
         target = SELECTS["mode"]["options"][MODE_CUSTOM][1]

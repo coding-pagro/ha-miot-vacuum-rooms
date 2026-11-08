@@ -18,7 +18,7 @@ from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_state_change_event
 
-from .const import DOMAIN, MODE_CUSTOM, SELECTS
+from .const import DOMAIN, MODE_CUSTOM, PROBLEM_NONE, SELECTS
 from .controller import _UNAVAILABLE, MiotVacuumConfigEntry, VacuumController
 
 # Schlüssel der Reparaturmeldung in Core (homeassistant.components.vacuum)
@@ -88,7 +88,14 @@ class MiotRoomsVacuum(StateVacuumEntity):
         self._async_check_segments_changed()
         tracked = [
             entity_id
-            for role in ("vacuum", "prop_fan", "prop_mode", "prop_task")
+            for role in (
+                "vacuum",
+                "prop_fan",
+                "prop_mode",
+                "prop_task",
+                "prop_error",
+                "prop_station_error",
+            )
             if (entity_id := self._controller.entity_id(role)) is not None
         ]
         self._update()
@@ -117,6 +124,10 @@ class MiotRoomsVacuum(StateVacuumEntity):
                 if self._controller.job_paused
                 else VacuumActivity.CLEANING
             )
+        problem = self._controller.problem
+        has_problem = problem is not None and problem[0] != PROBLEM_NONE
+        if has_problem and state not in _UNAVAILABLE:
+            self._attr_activity = VacuumActivity.ERROR
         if state not in _UNAVAILABLE and state not in _ACTIVITIES:
             if state not in self._logged_states:
                 self._logged_states.add(state)
@@ -126,7 +137,8 @@ class MiotRoomsVacuum(StateVacuumEntity):
         )
         mode = self._controller.state("prop_mode")
         self._attr_extra_state_attributes = {
-            "cleaning_mode": self._mode_from_sensor.get(mode)
+            "cleaning_mode": self._mode_from_sensor.get(mode),
+            "problem": problem[0] if has_problem else None,
         }
         # Im Modus Personalisieren ist die globale Saugleistung ohne Wirkung:
         # die Steuerung verschwindet aus dem Dialog (wie bei Dreame).
