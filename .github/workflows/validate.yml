@@ -26,7 +26,7 @@ jobs:
       - uses: hacs/action@22.5.0
         with:
           category: integration
-          # Submitting brand assets to home-assistant/brands is deliberately
-          # out of scope: this is a custom HACS repository, not part of the
-          # HACS default store, so the brands check does not apply.
+          # The integration ships no brand assets (no brand/icon.png, no entry in
+          # home-assistant/brands). Providing them is deliberately out of scope
+          # for this repository, so the brands check is skipped.
           ignore: brands

@@ -201,7 +201,7 @@ uv pip install --python ~/.venvs/miot-vacuum-rooms -r requirements_test.txt
 
 Then set `MIOT_WSL_VENV=/home/<user>/.venvs/miot-vacuum-rooms` on Windows. A venv in your Linux home is much faster than one on the Windows drive and works for all checkouts. In git worktrees `MIOT_WSL_VENV` is required, because a `.venv-wsl/` only exists in the checkout where it was created.
 
-**CI:** `.github/workflows/tests.yml` runs the tests on every push and pull request against the minimum (2026.3.x) and the current (2026.10.x) Home Assistant version.
+**CI:** `.github/workflows/validate.yml` runs hassfest and the HACS validation (daily and on every push and pull request). `.github/workflows/tests.yml` runs the tests on every push and pull request against the minimum (2026.3.x) and the current (2026.10.x) Home Assistant version.
 
 ## Releasing
 
