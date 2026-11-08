@@ -40,6 +40,15 @@ ROLES: dict[str, tuple[str, int]] = {
     "prop_route": ("p", 65),
 }
 
+# Optionale Rollen: Rolle -> (Domain, Art, Nummer). Fehlen sie am Gerät,
+# klappt die Einrichtung trotzdem, nur die zugehörige Funktion fehlt.
+# stop-clean (a_17_3) hat keine Parameter, Xiaomi Home legt dafür eine Taste
+# an (button.<gerät>_stop_clean_a_17_3). Am Gerät bestätigt: beendet einen
+# pausierten Auftrag in der Station ("Area Pause" -> "Idle").
+OPTIONAL_ROLES: dict[str, tuple[str, str, int]] = {
+    "act_stop_clean": ("button", "a", 3),
+}
+
 # clean-type für start-clean
 CLEAN_TYPE_FULL = 1  # nur abgeleitet, am Gerät NICHT gesendet
 CLEAN_TYPE_AREA = 3  # bestätigt

@@ -31,6 +31,7 @@ The integration's UI is available in English and German.
 - The device has entities with these suffixes (service 17):
   - Actions (`notify`): `a_17_1`, `a_17_26`, `a_17_27`, `a_17_28`, `a_17_46`, `a_17_50`
   - Sensors (`sensor`): `p_17_9`, `p_17_10`, `p_17_13`, `p_17_14`, `p_17_34`, `p_17_65`
+  - Optional: the button `stop_clean_a_17_3` (`button`). Without it, Stop cannot end a job on the dock. Xiaomi Home creates it, but it may be disabled; enable it under the device's entities.
 - Existing setups pick up sensors added in later versions (such as `p_17_9`) automatically on the next start.
 - If one of them is missing, the setup names it.
 
@@ -97,8 +98,9 @@ The integration adds its own vacuum entity (`vacuum.<device>`) to its device. It
 
 | Button / action | What happens |
 |---|---|
-| Start | Robot **paused** away from the dock: resumes the paused run. Job **paused on the dock** (after "return to base" during a run, or while the mop is washed): refuses, resume or end the job in the app (resuming from the dock is untested). Otherwise: cleans **all learned rooms** like `clean_rooms` (same dock check). Without learned rooms it refuses. It never starts a run without a room selection. |
-| Pause, stop, return to base | Passed through to the Xiaomi vacuum. **Stop** on the Jonr P20 Pro does **not** end a paused job (tested); end it in the app. |
+| Start | Robot **paused** away from the dock: resumes the paused run. Job **paused on the dock** (after "return to base" during a run, or while the mop is washed): refuses; end the job with Stop, or resume it in the app (resuming from the dock is untested). Otherwise: cleans **all learned rooms** like `clean_rooms` (same dock check). Without learned rooms it refuses. It never starts a run without a room selection. |
+| Pause, return to base | Passed through to the Xiaomi vacuum. |
+| Stop | Robot on the dock with an open job: ends the job with `stop-clean` (`a_17_3`). The Xiaomi stop does nothing on the dock. Confirmed on the device for a paused job; for a running job on the dock (mop washing before it drives off) untested. Needs the enabled button `stop_clean_a_17_3`, otherwise Stop refuses with a hint. In all other cases passed through to the Xiaomi vacuum. |
 | Fan speed | Global suction power, see below. Hidden while the cleaning mode is *Customised*. |
 | `vacuum.clean_area` | Cleans the rooms mapped to the given areas, in the given order. |
 

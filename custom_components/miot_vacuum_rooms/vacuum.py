@@ -178,6 +178,17 @@ class MiotRoomsVacuum(StateVacuumEntity):
         await self._controller.async_vacuum_command("pause")
 
     async def async_stop(self, **kwargs: Any) -> None:
+        """In der Station mit offenem Auftrag: Auftrag beenden. Sonst durchreichen.
+
+        Der Stopp des Xiaomi-Saugroboters wird in der Station ignoriert, der
+        Auftrag bliebe offen. Bestätigt ist das Beenden für einen pausierten
+        Auftrag; für einen laufenden in der Station (Mopp waschen vor dem
+        Losfahren) ist stop-clean ungetestet.
+        """
+        state = self._controller.state("vacuum")
+        if state in _AT_BASE and self._controller.job_pending:
+            await self._controller.async_stop_job()
+            return
         await self._controller.async_vacuum_command("stop")
 
     async def async_return_to_base(self, **kwargs: Any) -> None:
