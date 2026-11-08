@@ -90,6 +90,10 @@ def build_device(hass: HomeAssistant):
             add("notify", f"{PREFIX}_{name}")
         for name in SENSOR.values():
             add("sensor", f"{PREFIX}_{name}")
+        # Gleiche Domain und Aktionsnummer wie stop-clean, aber Dienst 7
+        # (bit-test): darf nicht als stop-clean gefunden werden. Steht vorne,
+        # damit die Suche sie zuerst sieht.
+        add("button", f"{PREFIX}_quit_bit_mode_a_7_3")
         for name in BUTTON.values():
             add("button", f"{PREFIX}_{name}")
 

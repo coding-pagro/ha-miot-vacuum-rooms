@@ -100,7 +100,8 @@ async def test_config_flow_creates_entry(hass: HomeAssistant, build_device) -> N
     assert result["title"] == "Robbi"
     assert "act_start" in result["data"][CONF_SOURCES]
     assert "prop_values" in result["data"][CONF_SOURCES]
-    assert "act_stop_clean" in result["data"][CONF_SOURCES]
+    stop_clean = er.async_get(hass).async_get(result["data"][CONF_SOURCES]["act_stop_clean"])
+    assert stop_clean.entity_id == button_id("stop_clean")
 
 
 async def test_config_flow_without_optional_stop_clean(
