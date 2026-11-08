@@ -30,6 +30,7 @@ ROLES: dict[str, tuple[str, int]] = {
     "act_mode": ("a", 46),
     "act_route": ("a", 50),
     "prop_values": ("p", 34),
+    "prop_task": ("p", 9),
     "prop_mode": ("p", 10),
     "prop_fan": ("p", 13),
     "prop_count": ("p", 14),
@@ -93,6 +94,13 @@ SELECTS: dict[str, dict] = {
 }
 
 MODE_CUSTOM = "custom"
+
+# Auftragsstatus (clean-type-status, p_17_9), am Gerät beobachtet:
+# Idle, Area Clean/Pause/Resume, Full Clean/Pause. Während eines Auftrags
+# meldet der Xiaomi-Saugroboter beim Mopp-Waschen "docked", der Auftrag
+# steht dann auf "... Pause". Nur "Idle" (oder "None") heißt: kein Auftrag offen.
+TASK_IDLE = ("Idle", "None")
+TASK_PAUSE_SUFFIX = " Pause"
 
 SERVICE_CLEAN_ROOMS = "clean_rooms"
 SERVICE_CLEAN_FLOOR = "clean_floor"

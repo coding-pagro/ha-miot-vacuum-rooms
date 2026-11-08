@@ -174,6 +174,66 @@ async def test_clean_rooms_dock_check_can_be_disabled(
     assert len(calls) == 1
 
 
+@pytest.mark.parametrize("task", ["Area Pause", "Area Clean", "Area Resume", "Full Pause"])
+async def test_clean_rooms_refused_while_job_open(
+    hass: HomeAssistant, build_device, task: str
+) -> None:
+    """Mitten im Auftrag meldet der Roboter beim Mopp-Waschen "docked"."""
+    _, calls = await _setup(hass, build_device)
+    hass.states.async_set(sensor_id("task"), task)
+    with pytest.raises(ServiceValidationError) as err:
+        await hass.services.async_call(
+            DOMAIN, "clean_rooms", {"rooms": ["Küche"]}, blocking=True
+        )
+    assert err.value.translation_key == "job_pending"
+    assert calls == []
+
+
+async def test_clean_rooms_job_check_off_with_dock_option(
+    hass: HomeAssistant, build_device
+) -> None:
+    _, calls = await _setup(hass, build_device, **{CONF_REQUIRE_DOCKED: False})
+    hass.states.async_set(sensor_id("task"), "Area Pause")
+    hass.states.async_set(sensor_id("mode"), "Custom")
+    await hass.services.async_call(
+        DOMAIN, "clean_rooms", {"rooms": ["Küche"]}, blocking=True
+    )
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize("task", ["unavailable", "None"])
+async def test_clean_rooms_without_job_status(
+    hass: HomeAssistant, build_device, task: str
+) -> None:
+    """Kein Auftrag ("None") oder Status unbekannt: Verhalten wie vorher."""
+    _, calls = await _setup(hass, build_device)
+    hass.states.async_set(sensor_id("task"), task)
+    hass.states.async_set(sensor_id("mode"), "Custom")
+    await hass.services.async_call(
+        DOMAIN, "clean_rooms", {"rooms": ["Küche"]}, blocking=True
+    )
+    assert len(calls) == 1
+
+
+async def test_existing_entry_gets_new_source(hass: HomeAssistant, build_device) -> None:
+    """Einträge von vor der Rolle prop_task bekommen sie beim Start ergänzt."""
+    build_device()
+    sources = discover_sources(hass, VACUUM)
+    old = {role: rid for role, rid in sources.items() if role != "prop_task"}
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Robbi",
+        unique_id=sources["vacuum"],
+        data={CONF_SOURCES: old},
+        options={CONF_ROOMS: ROOMS},
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert entry.data[CONF_SOURCES] == sources
+    assert entry.runtime_data.entity_id("prop_task") == sensor_id("task")
+
+
 async def test_clean_rooms_unknown_room(hass: HomeAssistant, build_device) -> None:
     _, calls = await _setup(hass, build_device)
     with pytest.raises(ServiceValidationError):

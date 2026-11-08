@@ -3,6 +3,7 @@
 Add-on integration for the **official Xiaomi Home integration** in Home Assistant. Some robot vacuums only show up there as raw MIoT entities (`notify.…_a_17_1`, `sensor.…_p_17_13`). This integration builds a usable interface on top of them, without the Xiaomi cloud map or extra credentials:
 
 - **Clean rooms by name**, also several rooms in a chosen order
+- **Own vacuum entity** with a safe start button, fan speed and **cleaning by Home Assistant areas** (`vacuum.clean_area`)
 - **Select entities** for cleaning mode, suction power, water level, passes and route preference
 - **One button per room**
 - **Learn rooms**: briefly start a room in the app, and the integration picks up its room ID
@@ -17,16 +18,19 @@ The integration's UI is available in English and German.
 |---|---|
 | Commands and values | Confirmed on a real **Jonr P20 Pro** (`xtl.vacuum.xm2216`) via the Xiaomi Home integration |
 | Room start `[3, "[ID]"]`, Customised mode | Confirmed on the device (per-room settings from the app apply) |
+| Room start with global settings (switch "Use room settings from the app" off) | **Untested** on the device |
 | Integration code | Tested in a Home Assistant test environment, **not yet installed in a live instance** |
 | Whole-floor service | **Untested**, command derived from app behaviour |
 | Other models | Unverified. They only work if they use the same MIoT specification (service 17) with the same numbers and values |
 
 ## Requirements
 
+- Home Assistant **2026.3.0** or later (first version with area cleaning for vacuums)
 - Official Xiaomi Home integration set up with the robot vacuum
 - The device has entities with these suffixes (service 17):
   - Actions (`notify`): `a_17_1`, `a_17_26`, `a_17_27`, `a_17_28`, `a_17_46`, `a_17_50`
-  - Sensors (`sensor`): `p_17_10`, `p_17_13`, `p_17_14`, `p_17_34`, `p_17_65`
+  - Sensors (`sensor`): `p_17_9`, `p_17_10`, `p_17_13`, `p_17_14`, `p_17_34`, `p_17_65`
+- Existing setups pick up sensors added in later versions (such as `p_17_9`) automatically on the next start.
 - If one of them is missing, the setup names it.
 
 ## Installation
@@ -70,11 +74,51 @@ data:
 ```
 
 - The order of the names is the cleaning order.
-- The service switches to **Customised** mode and waits up to 10 seconds for confirmation. In this mode the **per-room settings from the app** apply (suction power, water level, passes per room). The global select entities have no effect on the run.
-- By default it only starts when the robot is on its dock (`docked`). Starting in the middle of a job made the robot lose its orientation. The condition can be switched off in the options.
-- The mode stays on Customised afterwards.
+- By default it only starts when the robot is on its dock (`docked`) **and no job is open** (job status `p_17_9` is `Idle`). Starting in the middle of a job made the robot lose its orientation. The robot also reports `docked` in the middle of a job, when it returns to wash the mop (job status `Area Pause`), and a robot with a paused job ignores new room starts. The condition can be switched off in the options.
+
+The switch **"Use room settings from the app"** (on the integration's device, default on, survives restarts) decides which settings apply:
+
+| Switch | Behaviour |
+|---|---|
+| **On** (default) | The service switches to **Customised** mode and waits up to 10 seconds for confirmation. In this mode the **per-room settings from the app** apply (suction power, water level, passes per room). The global select entities have no effect on the run. The mode stays on Customised afterwards. |
+| **Off** | The mode is **not** changed. The **global** cleaning mode, suction power, water level and passes apply to the selected rooms. If the global mode is *Customised*, the start is refused: pick another cleaning mode first. **Untested on the device:** only the room start in Customised mode is confirmed so far. |
+
+The switch applies to everything that cleans rooms: `clean_rooms`, the room buttons, the start button of the vacuum entity and `vacuum.clean_area`.
 
 Every learned room also gets a "Clean …" button that calls the same service for that one room.
+
+## Vacuum entity
+
+The integration adds its own vacuum entity (`vacuum.<device>`) to its device. It mirrors the state of the Xiaomi vacuum and is unavailable when that one is. One difference: when the robot is on its dock but a job is open, it does not show Docked. With a paused job (job status ends in `Pause`, e.g. after "return to base" during a run, or while the mop is washed in the middle of a job) it shows **Paused**, with a running job (e.g. washing the mop before it drives off) **Cleaning**. The Xiaomi entity starts without a room selection, with whatever global mode is set, and even in the middle of a job. This entity does not:
+
+| Button / action | What happens |
+|---|---|
+| Start | Robot **paused** away from the dock: resumes the paused run. Job **paused on the dock** (after "return to base" during a run, or while the mop is washed): refuses, resume or end the job in the app (resuming from the dock is untested). Otherwise: cleans **all learned rooms** like `clean_rooms` (same dock check). Without learned rooms it refuses. It never starts a run without a room selection. |
+| Pause, stop, return to base | Passed through to the Xiaomi vacuum. **Stop** on the Jonr P20 Pro does **not** end a paused job (tested); end it in the app. |
+| Fan speed | Global suction power, see below. Hidden while the cleaning mode is *Customised*. |
+| `vacuum.clean_area` | Cleans the rooms mapped to the given areas, in the given order. |
+
+**Area cleaning:** open the vacuum entity → settings → map Home Assistant areas to the learned rooms. Then areas work in `vacuum.clean_area`, for example from the vacuum card or a voice assistant:
+
+```yaml
+action: vacuum.clean_area
+target:
+  entity_id: vacuum.my_vacuum
+data:
+  cleaning_area_id:
+    - kitchen
+    - hallway
+```
+
+If the set of room IDs changes after you mapped the areas (learning a new room, forgetting one, or editing the IDs in the options), Home Assistant shows a repair notice. Open it and check the mapping again. Renaming a room keeps the mapping, because it is stored by room ID.
+
+**Fan speed:** there are two suction power values. The **global** one (shown and set by the fan speed of this entity and by the "Suction power" select) and the **per-room** one from the app, which Home Assistant can neither read nor set. In *Customised* mode the robot uses the per-room value, so the fan speed of this entity only matters for room cleaning when **"Use room settings from the app" is off** (see Cleaning rooms). With the switch on, it has no effect on room cleaning.
+
+So while the cleaning mode is *Customised*, the vacuum entity **hides its fan speed** (the control disappears from the dialog and `vacuum.set_fan_speed` is refused). It comes back as soon as another cleaning mode is selected. With the switch on, every room start sets *Customised*, so in practice the fan speed only shows when you deliberately pick another mode, which is exactly when it has an effect. The "Suction power" select stays available to set the global value at any time.
+
+**Cleaning mode:** the vacuum dialog has no field for it, so the entity reports it as the attribute `cleaning_mode` (shown translated under *Attributes* in the dialog). To see and change it at a glance, put the "Cleaning mode" select next to the vacuum on your dashboard.
+
+**Tip:** the Xiaomi vacuum entity is no longer needed on dashboards. You can hide it: Settings → Entities → select the Xiaomi vacuum → settings → *Visible* off. Do not disable or delete it, this integration reads its state and sends commands through it.
 
 ## Select entities
 
@@ -109,7 +153,30 @@ With several vacuums, pass `entry_id` each time.
 
 ## Development
 
+The tests use [`pytest-homeassistant-custom-component`](https://github.com/MatthewFlamm/pytest-homeassistant-custom-component), which runs on Linux and macOS, not on Windows. `requirements_test.txt` pins the release that matches the current Home Assistant version. Home Assistant 2026.3 and later need **Python 3.14**.
+
+**One command for all environments:**
+
 ```
-python -m venv venv && venv/bin/pip install pytest-homeassistant-custom-component
-venv/bin/pytest
+python scripts/check.py
 ```
+
+It picks the mode from the environment and prints which one it chose and why. The exit code is the test result. Extra arguments go to pytest (local and WSL mode), e.g. `python scripts/check.py -k vacuum`.
+
+| Environment | Mode |
+|---|---|
+| Linux, macOS | Runs `python -m pytest` locally. Needs a venv with `requirements_test.txt` installed (`python3.14 -m venv .venv && .venv/bin/pip install -r requirements_test.txt`). |
+| Windows with WSL | Runs the tests inside WSL with the venv from the environment variable `MIOT_WSL_VENV` (a Linux path) or `.venv-wsl/` in the repository. If `requirements_test.txt` changed since the last run, it updates the venv first (with `uv` inside WSL). |
+| Windows without WSL | **CI mode:** pushes the current branch and waits for the GitHub Actions run of this commit (needs a logged-in `gh`). It refuses to run on `main` or with uncommitted changes, because CI only tests commits. On failure it prints the failed log. |
+
+Setting up the WSL venv (once, inside WSL, from the repository folder; later updates happen automatically):
+
+```
+curl -LsSf https://astral.sh/uv/install.sh | sh
+uv venv --python 3.14 ~/.venvs/miot-vacuum-rooms
+uv pip install --python ~/.venvs/miot-vacuum-rooms -r requirements_test.txt
+```
+
+Then set `MIOT_WSL_VENV=/home/<user>/.venvs/miot-vacuum-rooms` on Windows. A venv in your Linux home is much faster than one on the Windows drive and works for all checkouts. In git worktrees `MIOT_WSL_VENV` is required, because a `.venv-wsl/` only exists in the checkout where it was created.
+
+**CI:** `.github/workflows/tests.yml` runs the tests on every push and pull request against the minimum (2026.3.x) and the current (2026.10.x) Home Assistant version.
