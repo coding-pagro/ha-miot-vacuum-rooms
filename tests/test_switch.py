@@ -12,7 +12,7 @@ from homeassistant.helpers import entity_registry as er
 from custom_components.miot_vacuum_rooms.const import DOMAIN
 
 from .conftest import VACUUM, notify_id, sensor_id
-from .test_integration import _setup
+from .test_integration import _setup, robot_idle
 
 SWITCH = "switch.robbi_use_room_settings_from_the_app"
 
@@ -61,6 +61,7 @@ async def test_switch_off_keeps_global_mode(hass: HomeAssistant, build_device) -
     assert _messages(calls) == [(notify_id("start"), '[3, "[12,4]"]')]
 
     await _turn(hass, True)
+    robot_idle(hass)
     calls.clear()
     await _clean(hass, "Flur")
     assert [m for _, m in _messages(calls)] == ["[4]", '[3, "[5]"]']
@@ -101,6 +102,7 @@ async def test_switch_off_applies_to_vacuum_and_buttons(
     await hass.services.async_call(
         "vacuum", "start", {"entity_id": vacuum}, blocking=True
     )
+    robot_idle(hass)
     button = registry.async_get_entity_id("button", DOMAIN, f"{entry.entry_id}_room_5")
     await hass.services.async_call(
         "button", "press", {"entity_id": button}, blocking=True

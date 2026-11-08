@@ -92,3 +92,25 @@ def resolve_room_ids(rooms: dict[str, int], names: list[str]) -> list[int]:
         if room_id not in ids:
             ids.append(room_id)
     return ids
+
+
+def start_accepted(
+    task: str | None,
+    values: str | None,
+    room_ids: list[int] | None,
+    idle: tuple[str, ...] = ("Idle", "None"),
+) -> bool:
+    """Prüft, ob der Roboter einen Start übernommen hat.
+
+    Übernommen heißt: Auftragsstatus (p_17_9) ist bekannt und nicht Idle, und
+    bei Raumreinigung enthält clean-values (p_17_34) genau die angeforderten
+    IDs (Reihenfolge egal). room_ids=None steht für das ganze Stockwerk, dort
+    zählt nur der Status.
+    idle: Auftragsstatus ohne offenen Auftrag (const.TASK_IDLE).
+    """
+    if task is None or task in ("", "unknown", "unavailable") or task in idle:
+        return False
+    if room_ids is None:
+        return True
+    current = parse_clean_values(values)
+    return current is not None and sorted(current) == sorted(room_ids)

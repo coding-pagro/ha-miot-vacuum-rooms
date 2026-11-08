@@ -22,6 +22,8 @@ from .const import (
     DOMAIN,
     MODE_CUSTOM,
     SELECTS,
+    START_ATTEMPTS,
+    START_CONFIRM_SECONDS,
     TASK_IDLE,
     TASK_PAUSE_SUFFIX,
     WAIT_MODE_SECONDS,
@@ -31,6 +33,7 @@ from .util import (
     build_value_message,
     parse_clean_values,
     resolve_room_ids,
+    start_accepted,
 )
 
 type MiotVacuumConfigEntry = ConfigEntry[VacuumController]
@@ -240,9 +243,7 @@ class VacuumController:
             await self._async_ensure_custom_mode()
         else:
             self._check_global_mode()
-        await self.async_send(
-            "act_start", build_start_message(CLEAN_TYPE_AREA, room_ids)
-        )
+        await self._async_start_verified(CLEAN_TYPE_AREA, room_ids)
 
     async def async_clean_floor(self) -> None:
         """Startet eine Reinigung des ganzen Stockwerks.
@@ -251,7 +252,79 @@ class VacuumController:
         den die App beim Start meldet (Full Clean, clean-values = []).
         """
         self._check_ready()
-        await self.async_send("act_start", build_start_message(CLEAN_TYPE_FULL))
+        await self._async_start_verified(CLEAN_TYPE_FULL, None)
+
+    async def _async_start_verified(
+        self, clean_type: int, room_ids: list[int] | None
+    ) -> None:
+        """Sendet den Start und prüft, ob der Roboter ihn übernimmt.
+
+        Die Cloud bestätigt auch Befehle, die der Roboter verwirft. Bleibt die
+        Übernahme (Status nicht Idle, bei Räumen passende clean-values) aus,
+        wird nach START_CONFIRM_SECONDS erneut gesendet, höchstens
+        START_ATTEMPTS-mal. Fehlt ein Sensor, wird einmal gesendet.
+        """
+        message = build_start_message(clean_type, room_ids)
+        task_entity = self.entity_id("prop_task")
+        values_entity = self.entity_id("prop_values")
+        if (
+            task_entity is None
+            or values_entity is None
+            or self.state("prop_task") in _UNAVAILABLE
+            or self.state("prop_values") in _UNAVAILABLE
+        ):
+            await self.async_send("act_start", message)
+            return
+
+        def accepted() -> bool:
+            return start_accepted(
+                self.state("prop_task"),
+                self.state("prop_values"),
+                room_ids,
+                TASK_IDLE,
+            )
+
+        for _ in range(START_ATTEMPTS):
+            await self.async_send("act_start", message)
+            if await self._async_wait_until(
+                [task_entity, values_entity], accepted, START_CONFIRM_SECONDS
+            ):
+                return
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="start_not_confirmed",
+            translation_placeholders={
+                "attempts": str(START_ATTEMPTS),
+                "seconds": str(START_CONFIRM_SECONDS),
+            },
+        )
+
+    async def _async_wait_until(
+        self, entity_ids: list[str], condition: Callable[[], bool], timeout: float
+    ) -> bool:
+        """Wartet, bis condition wahr ist; prüft bei jeder Zustandsänderung.
+
+        Der aktuelle Zustand wird zuerst geprüft, damit eine Änderung zwischen
+        Senden und Warten nicht verloren geht.
+        """
+        future: asyncio.Future[None] = self.hass.loop.create_future()
+
+        @callback
+        def _changed(event: Event) -> None:
+            if not future.done() and condition():
+                future.set_result(None)
+
+        unsub = async_track_state_change_event(self.hass, entity_ids, _changed)
+        try:
+            if condition():
+                return True
+            async with asyncio.timeout(timeout):
+                await future
+            return True
+        except TimeoutError:
+            return False
+        finally:
+            unsub()
 
     # --- Räume anlernen -------------------------------------------------
 

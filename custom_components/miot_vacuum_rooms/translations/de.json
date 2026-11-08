@@ -208,6 +208,9 @@
     "entry_required": {
       "message": "Es sind mehrere Saugroboter eingerichtet. Bitte entry_id angeben."
     },
+    "start_not_confirmed": {
+      "message": "Der Roboter hat den Start nach {attempts} Versuchen mit je {seconds} s nicht übernommen. Die Cloud hat den Befehl bestätigt, der Roboter führt ihn aber nicht aus (z. B. bei der Mopp-Wäsche oder im Akku-Zyklus). Später erneut versuchen."
+    },
     "job_pending": {
       "message": "Ein Reinigungsauftrag läuft noch oder ist pausiert (Status: {status}), auch wenn der Saugroboter in der Station steht. Start abgebrochen. Warten, bis der Auftrag fertig ist, oder ihn in der App beenden."
     },
