@@ -27,6 +27,9 @@ SENSOR = {
     "fan": "fan_mode_p_17_13",
     "count": "clean_count_p_17_14",
     "route": "fine_drag_p_17_65",
+    "error": "error_p_17_35",
+    "station_error": "station_error_p_17_79",
+    "water_tank": "clean_water_cistern_p_17_51",
 }
 
 
@@ -88,6 +91,9 @@ def build_device(hass: HomeAssistant):
         hass.states.async_set(sensor_id("route"), "Fine")
         hass.states.async_set(sensor_id("values"), "")
         hass.states.async_set(sensor_id("task"), "Idle")
+        hass.states.async_set(sensor_id("error"), "0")
+        hass.states.async_set(sensor_id("station_error"), "0")
+        hass.states.async_set(sensor_id("water_tank"), "Normal")
         return VACUUM
 
     return _build

@@ -17,7 +17,13 @@ from .const import CONF_SOURCES, DOMAIN, ROLES
 from .discovery import MissingSourcesError, NoDeviceError, discover_sources
 from .services import async_register_services
 
-PLATFORMS = [Platform.SWITCH, Platform.SELECT, Platform.BUTTON, Platform.VACUUM]
+PLATFORMS = [
+    Platform.SWITCH,
+    Platform.SELECT,
+    Platform.BUTTON,
+    Platform.SENSOR,
+    Platform.VACUUM,
+]
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
@@ -40,7 +46,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: MiotVacuumConfigEntry) 
 
 @callback
 def _async_add_new_sources(hass: HomeAssistant, entry: MiotVacuumConfigEntry) -> None:
-    """Ergänzt Rollen, die nach der Einrichtung dazugekommen sind (z. B. prop_task).
+    """Ergänzt Rollen, die nach der Einrichtung dazugekommen sind (z. B. prop_task, prop_error).
 
     Gelingt die Suche nicht, bleibt alles wie es ist; die Steuerung kommt
     ohne die neue Rolle aus (Verhalten wie vorher).

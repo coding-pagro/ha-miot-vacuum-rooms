@@ -111,6 +111,33 @@
               "sweep_then_mop": "Vacuum, then mop",
               "custom": "Customised"
             }
+          },
+          "problem": {
+            "name": "Problem",
+            "state": {
+              "robot_unknown": "Robot error (unknown code)",
+              "station_unknown": "Station error (unknown code)",
+              "station_4502": "Not enough water or no dirty water tank installed"
+            }
+          }
+        }
+      }
+    },
+    "sensor": {
+      "problem": {
+        "name": "Problem",
+        "state": {
+          "none": "No problem",
+          "robot_unknown": "Robot error (unknown code)",
+          "station_unknown": "Station error (unknown code)",
+          "station_4502": "Not enough water or no dirty water tank installed"
+        },
+        "state_attributes": {
+          "robot_error_code": {
+            "name": "Robot error code"
+          },
+          "station_error_code": {
+            "name": "Station error code"
           }
         }
       }
