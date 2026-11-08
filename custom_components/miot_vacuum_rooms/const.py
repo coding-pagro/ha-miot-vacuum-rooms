@@ -139,6 +139,11 @@ PROBLEM_OPTIONS = [
     *STATION_ERROR_CODES.values(),
 ]
 
+# Sensor "Räume im aktuellen Lauf": Zustände ohne Raumnamen. clean-values
+# (p_17_34) ist zwischen den Läufen "" und beim ganzen Stockwerk "[]".
+CURRENT_ROOMS_IDLE = "idle"
+CURRENT_ROOMS_WHOLE_FLOOR = "whole_floor"
+
 SERVICE_CLEAN_ROOMS = "clean_rooms"
 SERVICE_CLEAN_FLOOR = "clean_floor"
 SERVICE_LEARN_ROOM = "learn_room"
