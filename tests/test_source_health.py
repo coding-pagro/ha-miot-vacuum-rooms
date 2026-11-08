@@ -325,6 +325,32 @@ async def test_dead_vacuum_one_candidate_healed(
     assert _issue(hass, "missing_sources", entry) is None
 
 
+async def test_dead_vacuum_owned_by_other_entry_not_healed(
+    hass: HomeAssistant, build_device
+) -> None:
+    """Der Ersatz gehört schon einem neu eingerichteten Eintrag: keine Übernahme."""
+    build_device()
+    sources = discover_sources(hass, VACUUM)
+    _remove(hass, VACUUM)
+    new_id = _add_vacuum(hass, "replacement")
+    other = MockConfigEntry(
+        domain=DOMAIN,
+        title="Robbi neu",
+        unique_id=new_id,
+        data={CONF_SOURCES: {**sources, "vacuum": new_id}},
+        options={CONF_ROOMS: ROOMS},
+    )
+    other.add_to_hass(hass)  # nicht geladen, belegt aber die unique_id
+
+    entry = await _setup_entry(hass, sources)
+
+    assert entry.data[CONF_SOURCES]["vacuum"] == sources["vacuum"]
+    assert entry.unique_id == sources["vacuum"]
+    issue = _issue(hass, "missing_sources", entry)
+    assert issue is not None
+    assert issue.translation_placeholders["entities"] == "vacuum"
+
+
 async def test_renamed_source_needs_no_heal(hass: HomeAssistant, build_device) -> None:
     """Neue Entitäts-ID, gleiche Registry-ID: keine Heilung, keine Meldung."""
     build_device()

@@ -25,7 +25,8 @@ from .util import parse_entity_suffix
 _LOGGER = logging.getLogger(__name__)
 
 # Ein Update von Xiaomi Home entfernt und erzeugt viele Entitäten kurz
-# hintereinander; die Prüfung läuft erst, wenn es ruhig geworden ist.
+# hintereinander; die Prüfung läuft CHECK_COOLDOWN Sekunden nach dem ersten
+# Ereignis und danach höchstens einmal je CHECK_COOLDOWN Sekunden.
 CHECK_COOLDOWN = 5
 
 # Änderungen an einer Entität, die eine Prüfung auslösen
@@ -91,6 +92,15 @@ def async_heal_sources(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     new_vacuum: str | None = None
     if not valid("vacuum"):
         new_vacuum = find_vacuum(hass, device_id)
+        # Gehört die neue Vacuum-Entität schon einem anderen Eintrag (neu
+        # eingerichtet, ohne den alten zu entfernen), bleibt sie fehlend.
+        owner = (
+            hass.config_entries.async_entry_for_domain_unique_id(DOMAIN, new_vacuum)
+            if new_vacuum is not None
+            else None
+        )
+        if owner is not None and owner.entry_id != entry.entry_id:
+            new_vacuum = None
         if new_vacuum is not None:
             sources["vacuum"] = new_vacuum
             changed = True
