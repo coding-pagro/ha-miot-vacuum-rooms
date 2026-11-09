@@ -199,11 +199,32 @@ Both messages appear and disappear without a restart: the integration checks aga
 
 ## Limitations
 
-- **No map.** The map data lives in the Xiaomi cloud. Through the official integration, the robot only reports a map ID locally. The cloud map integrations in HACS do not list `xtl` robots in their device lists (not verified).
-- **No zones.** They would need coordinates from the map.
-- **Per-room settings** (the icons below the rooms in the app) can be neither read nor set. The format of the `customization-rooms` action is unknown.
+- **No map.** The map data lives in the Xiaomi cloud. Through the official integration, the robot only reports a map ID locally. The robot names its map file over the LAN, but the file itself has to be downloaded from the cloud with a Xiaomi account; [JONR Local](#alternatives) does this once. This integration does not.
+- **No zones.** They would need coordinates from the map. Zone cleaning (`start-clean` type 4) is reported to work on this model, but this integration does not use it.
+- **Per-room settings** (the icons below the rooms in the app) can be neither read nor set through the Xiaomi Home entities. Other projects set them with the MIoT action 17.53 over a direct local connection (see [Alternatives](#alternatives)). [Assumption] The Xiaomi Home integration does not create an entity for this action; not verified.
 - **New map, new IDs:** [Assumption] If rooms are re-divided in the app or the map is recreated, the IDs change. Learn the rooms again.
 - Entities are recognised by the numbers at the end of their entity ID. Renaming entities does no harm (the mapping uses the entity registry), but a different naming scheme in the Xiaomi integration does.
+
+## Alternatives
+
+This integration is a small add-on to the official Xiaomi Home integration. It needs no token, no second account and no cloud map. If you need more than that, there are two related projects for the same robot (`xtl.vacuum.xm2216`, JONR P20 Pro). They are not tested together with this integration.
+
+| | This integration | [JONR Local](https://github.com/Krystianpoprostu/jonr-local) |
+|---|---|---|
+| Connection | Through the official Xiaomi Home integration (cloud) | Direct to the robot over the LAN (miIO, port 54321) |
+| Setup | Pick the vacuum, learn the rooms | Robot IP and device token, one Xiaomi sign-in for the token and the map |
+| Rooms | By name, learned from the app | By ID from the saved map, names from the map |
+| Map | No | Camera and card, saved copy, no live position |
+| Zones | No | Yes |
+| Per-room settings and room order | No | Yes (action 17.53) |
+| Works with a blocked internet connection | No (Xiaomi Home needs the cloud) | Yes, according to the author's test |
+| Other robots | [Assumption] Possibly, if they share the MIoT specification (service 17); not verified | No, JONR P20 Pro only |
+
+**Choose this integration** if you already use Xiaomi Home, want rooms and a clean vacuum entity, and do not want to handle a device token.
+
+**Choose JONR Local** if you want the map, zones, per-room settings from Home Assistant or a connection that works without the cloud. It replaces the Xiaomi Home integration for this robot; do not run both on the same robot without testing.
+
+Lineage: [`xiaomi-vac`](https://github.com/letitbe-dull/xiaomi-vac) → [`jonr-vac`](https://github.com/moriceh/jonr-vac) (JONR P20 Pro only, live cloud map) → [`jonr-local`](https://github.com/Krystianpoprostu/jonr-local) (adds the fully local mode). The command formats listed in these projects match what was confirmed on a device here for room starts (`[3, "[ids]"]`); the rest of their findings come from their own tests.
 
 ## Development
 
