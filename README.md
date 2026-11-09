@@ -18,10 +18,10 @@ The integration's UI is available in English and German.
 |---|---|
 | Commands and values | Confirmed on a real **Jonr P20 Pro** (`xtl.vacuum.xm2216`) via the Xiaomi Home integration |
 | Room start `[3, "[ID]"]`, Customised mode | Confirmed on the device (per-room settings from the app apply) |
-| Room start with global settings (switch "Use room settings from the app" off) | **Untested** on the device |
-| Integration code | Tested in a Home Assistant test environment, **not yet installed in a live instance** |
-| Whole-floor service | **Untested**, command derived from app behaviour |
-| Start verification with retry | Tested in the test environment only, **not tested on the device** (retry interval, deep-sleep behaviour) |
+| Room start with global settings (switch "Use room settings from the app" off) | Confirmed on the device |
+| Integration code | Tested in a Home Assistant test environment and installed in a live instance (release 0.1.0) |
+| Whole-floor service | **Untested on the device.** The command is derived from app behaviour; the same message is reported for this model in [hass-xiaomi-miot issue 2961](https://github.com/al-one/hass-xiaomi-miot/issues/2961) |
+| Start verification with retry | In use on the device since 0.1.0. It is not known whether a retry ever happened there; the retry path itself (interval, deep-sleep behaviour) is tested in the test environment only |
 | Other models | Unverified. They only work if they use the same MIoT specification (service 17) with the same numbers and values |
 
 ## Requirements
@@ -79,14 +79,14 @@ data:
 
 - The order of the names is the cleaning order.
 - By default it only starts when the robot is on its dock (`docked`) **and no job is open** (job status `p_17_9` is `Idle`). Starting in the middle of a job made the robot lose its orientation. The robot also reports `docked` in the middle of a job, when it returns to wash the mop (job status `Area Pause`), and a robot with a paused job ignores new room starts. The condition can be switched off in the options.
-- The start is verified: the cloud also confirms commands the robot never runs (e.g. during mop washing or the battery cycle). After sending, the integration waits up to 25 s until the job status (`p_17_9`) is no longer `Idle` and, for rooms, `p_17_34` lists the requested room IDs. Otherwise it sends again, up to 3 attempts, and then raises an error. Without the two sensors it sends once as before. Not yet tested on the device.
+- The start is verified: the cloud also confirms commands the robot never runs (e.g. during mop washing or the battery cycle). After sending, the integration waits up to 25 s until the job status (`p_17_9`) is no longer `Idle` and, for rooms, `p_17_34` lists the requested room IDs. Otherwise it sends again, up to 3 attempts, and then raises an error. Without the two sensors it sends once as before. In use on the device; whether a retry ever happened there is not known.
 
 The switch **"Use room settings from the app"** (on the integration's device, default on, survives restarts) decides which settings apply:
 
 | Switch | Behaviour |
 |---|---|
 | **On** (default) | The service switches to **Customised** mode and waits up to 10 seconds for confirmation. In this mode the **per-room settings from the app** apply (suction power, water level, passes per room). The global select entities have no effect on the run. The mode stays on Customised afterwards. |
-| **Off** | The mode is **not** changed. The **global** cleaning mode, suction power, water level and passes apply to the selected rooms. If the global mode is *Customised*, the start is refused: pick another cleaning mode first. **Untested on the device:** only the room start in Customised mode is confirmed so far. |
+| **Off** | The mode is **not** changed. The **global** cleaning mode, suction power, water level and passes apply to the selected rooms. If the global mode is *Customised*, the start is refused: pick another cleaning mode first. Confirmed on the device. |
 
 The switch applies to everything that cleans rooms: `clean_rooms`, the room buttons, the start button of the vacuum entity and `vacuum.clean_area`.
 
@@ -180,7 +180,7 @@ All values were confirmed on the device by switching them in the app and reading
 ## Other services
 
 - `miot_vacuum_rooms.forget_room`: remove a room and its button
-- `miot_vacuum_rooms.clean_floor`: whole floor with the global settings, **untested** (message `[1, "[]"]`)
+- `miot_vacuum_rooms.clean_floor`: whole floor with the global settings, **untested on the device** (message `[1, "[]"]`)
 
 With several vacuums, pass `entry_id` each time.
 
@@ -199,11 +199,32 @@ Both messages appear and disappear without a restart: the integration checks aga
 
 ## Limitations
 
-- **No map.** The map data lives in the Xiaomi cloud. Through the official integration, the robot only reports a map ID locally. The cloud map integrations in HACS do not list `xtl` robots in their device lists (not verified).
-- **No zones.** They would need coordinates from the map.
-- **Per-room settings** (the icons below the rooms in the app) can be neither read nor set. The format of the `customization-rooms` action is unknown.
+- **No map.** The map data lives in the Xiaomi cloud. Through the official integration, the robot only reports a map ID locally. The robot names its map file over the LAN, but the file itself has to be downloaded from the cloud with a Xiaomi account; [JONR Local](#alternatives) does this once. This integration does not.
+- **No zones.** They would need coordinates from the map. Zone cleaning (`start-clean` type 4) is reported to work on this model, but this integration does not use it.
+- **Per-room settings** (the icons below the rooms in the app) can be neither read nor set through the Xiaomi Home entities. Other projects set them with the MIoT action 17.53 over a direct local connection (see [Alternatives](#alternatives)). [Assumption] The Xiaomi Home integration does not create an entity for this action; not verified.
 - **New map, new IDs:** [Assumption] If rooms are re-divided in the app or the map is recreated, the IDs change. Learn the rooms again.
 - Entities are recognised by the numbers at the end of their entity ID. Renaming entities does no harm (the mapping uses the entity registry), but a different naming scheme in the Xiaomi integration does.
+
+## Alternatives
+
+This integration is a small add-on to the official Xiaomi Home integration. It needs no token, no second account and no cloud map. If you need more than that, there are two related projects for the same robot (`xtl.vacuum.xm2216`, JONR P20 Pro). They are not tested together with this integration.
+
+| | This integration | [JONR Local](https://github.com/Krystianpoprostu/jonr-local) |
+|---|---|---|
+| Connection | Through the official Xiaomi Home integration (cloud) | Direct to the robot over the LAN (miIO, port 54321) |
+| Setup | Pick the vacuum, learn the rooms | Robot IP and device token, one Xiaomi sign-in for the token and the map |
+| Rooms | By name, learned from the app | By ID from the saved map, names from the map |
+| Map | No | Camera and card, saved copy, no live position |
+| Zones | No | Yes |
+| Per-room settings and room order | No | Yes (action 17.53) |
+| Works with a blocked internet connection | No (Xiaomi Home needs the cloud) | Yes, according to the author's test |
+| Other robots | [Assumption] Possibly, if they share the MIoT specification (service 17); not verified | No, JONR P20 Pro only |
+
+**Choose this integration** if you already use Xiaomi Home, want rooms and a clean vacuum entity, and do not want to handle a device token.
+
+**Choose JONR Local** if you want the map, zones, per-room settings from Home Assistant or a connection that works without the cloud. It replaces the Xiaomi Home integration for this robot; do not run both on the same robot without testing.
+
+Lineage: [`xiaomi-vac`](https://github.com/letitbe-dull/xiaomi-vac) → [`jonr-vac`](https://github.com/moriceh/jonr-vac) (JONR P20 Pro only, live cloud map) → [`jonr-local`](https://github.com/Krystianpoprostu/jonr-local) (adds the fully local mode). The command formats listed in these projects match what was confirmed on a device here for room starts (`[3, "[ids]"]`); the rest of their findings come from their own tests.
 
 ## Development
 
@@ -234,19 +255,3 @@ uv pip install --python ~/.venvs/miot-vacuum-rooms -r requirements_test.txt
 Then set `MIOT_WSL_VENV=/home/<user>/.venvs/miot-vacuum-rooms` on Windows. A venv in your Linux home is much faster than one on the Windows drive and works for all checkouts. In git worktrees `MIOT_WSL_VENV` is required, because a `.venv-wsl/` only exists in the checkout where it was created.
 
 **CI:** `.github/workflows/validate.yml` runs hassfest and the HACS validation (daily and on every push and pull request). `.github/workflows/tests.yml` runs the tests on every push and pull request against the minimum (2026.3.x) and the current (2026.10.x) Home Assistant version.
-
-## Releasing
-
-Releases are automated with [release-please](https://github.com/googleapis/release-please). It reads the Conventional Commit messages on `main`.
-
-1. Develop as usual and test the change **manually in your local Home Assistant** before merging to `main`.
-2. After each merge, release-please opens or updates a **release PR** with the next version and the changelog. It also updates `version` in `custom_components/miot_vacuum_rooms/manifest.json`.
-3. Merge the release PR. This creates the tag `vX.Y.Z` and the GitHub release, which HACS offers as an update.
-
-`tests/test_release.py` checks that `manifest.json`, `.release-please-manifest.json` and `release-please-config.json` stay consistent.
-
-Notes:
-
-- **First release:** `release-please-config.json` contains `"release-as": "0.1.0"`. Remove that line after the first release is published, otherwise every release PR would propose 0.1.0 again.
-- **Repository setting:** *Settings → Actions → General → "Allow GitHub Actions to create and approve pull requests"* must be enabled, otherwise the workflow cannot open the release PR.
-- **No checks on the release PR:** pull requests created with the default `GITHUB_TOKEN` do not trigger other workflows (tests, validation). To get those checks, store a personal access token as a secret and pass it to the action via `token:`.
