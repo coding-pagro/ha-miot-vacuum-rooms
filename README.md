@@ -18,10 +18,10 @@ The integration's UI is available in English and German.
 |---|---|
 | Commands and values | Confirmed on a real **Jonr P20 Pro** (`xtl.vacuum.xm2216`) via the Xiaomi Home integration |
 | Room start `[3, "[ID]"]`, Customised mode | Confirmed on the device (per-room settings from the app apply) |
-| Room start with global settings (switch "Use room settings from the app" off) | **Untested** on the device |
-| Integration code | Tested in a Home Assistant test environment, **not yet installed in a live instance** |
-| Whole-floor service | **Untested**, command derived from app behaviour |
-| Start verification with retry | Tested in the test environment only, **not tested on the device** (retry interval, deep-sleep behaviour) |
+| Room start with global settings (switch "Use room settings from the app" off) | Confirmed on the device |
+| Integration code | Tested in a Home Assistant test environment and installed in a live instance (release 0.1.0) |
+| Whole-floor service | **Untested on the device.** The command is derived from app behaviour; the same message is reported for this model in [hass-xiaomi-miot issue 2961](https://github.com/al-one/hass-xiaomi-miot/issues/2961) |
+| Start verification with retry | In use on the device since 0.1.0. It is not known whether a retry ever happened there; the retry path itself (interval, deep-sleep behaviour) is tested in the test environment only |
 | Other models | Unverified. They only work if they use the same MIoT specification (service 17) with the same numbers and values |
 
 ## Requirements
@@ -79,14 +79,14 @@ data:
 
 - The order of the names is the cleaning order.
 - By default it only starts when the robot is on its dock (`docked`) **and no job is open** (job status `p_17_9` is `Idle`). Starting in the middle of a job made the robot lose its orientation. The robot also reports `docked` in the middle of a job, when it returns to wash the mop (job status `Area Pause`), and a robot with a paused job ignores new room starts. The condition can be switched off in the options.
-- The start is verified: the cloud also confirms commands the robot never runs (e.g. during mop washing or the battery cycle). After sending, the integration waits up to 25 s until the job status (`p_17_9`) is no longer `Idle` and, for rooms, `p_17_34` lists the requested room IDs. Otherwise it sends again, up to 3 attempts, and then raises an error. Without the two sensors it sends once as before. Not yet tested on the device.
+- The start is verified: the cloud also confirms commands the robot never runs (e.g. during mop washing or the battery cycle). After sending, the integration waits up to 25 s until the job status (`p_17_9`) is no longer `Idle` and, for rooms, `p_17_34` lists the requested room IDs. Otherwise it sends again, up to 3 attempts, and then raises an error. Without the two sensors it sends once as before. In use on the device; whether a retry ever happened there is not known.
 
 The switch **"Use room settings from the app"** (on the integration's device, default on, survives restarts) decides which settings apply:
 
 | Switch | Behaviour |
 |---|---|
 | **On** (default) | The service switches to **Customised** mode and waits up to 10 seconds for confirmation. In this mode the **per-room settings from the app** apply (suction power, water level, passes per room). The global select entities have no effect on the run. The mode stays on Customised afterwards. |
-| **Off** | The mode is **not** changed. The **global** cleaning mode, suction power, water level and passes apply to the selected rooms. If the global mode is *Customised*, the start is refused: pick another cleaning mode first. **Untested on the device:** only the room start in Customised mode is confirmed so far. |
+| **Off** | The mode is **not** changed. The **global** cleaning mode, suction power, water level and passes apply to the selected rooms. If the global mode is *Customised*, the start is refused: pick another cleaning mode first. Confirmed on the device. |
 
 The switch applies to everything that cleans rooms: `clean_rooms`, the room buttons, the start button of the vacuum entity and `vacuum.clean_area`.
 
@@ -180,7 +180,7 @@ All values were confirmed on the device by switching them in the app and reading
 ## Other services
 
 - `miot_vacuum_rooms.forget_room`: remove a room and its button
-- `miot_vacuum_rooms.clean_floor`: whole floor with the global settings, **untested** (message `[1, "[]"]`)
+- `miot_vacuum_rooms.clean_floor`: whole floor with the global settings, **untested on the device** (message `[1, "[]"]`)
 
 With several vacuums, pass `entry_id` each time.
 
